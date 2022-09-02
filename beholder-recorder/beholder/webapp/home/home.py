@@ -1,24 +1,24 @@
 """General page routes."""
-import psutil
+import psutil  # type: ignore
 import base64
 import datetime
 import subprocess
 import pathlib
-import pytz
+import pytz  # type: ignore
 
 from dateutil.parser import parse
 from urllib.parse import urlparse
 
-from flask import Blueprint, render_template, jsonify, request
-from flask import current_app as app
-from flask.helpers import make_response
-from flask_security import login_required
-from flask_login import current_user
+from flask import Blueprint, render_template, jsonify, request  # type: ignore
+from flask import current_app as app  # type: ignore
+from flask.helpers import make_response  # type: ignore
+from flask_security import login_required  # type: ignore
+from flask_login import current_user  # type: ignore
 
-from sqlalchemy import func
+from sqlalchemy import func  # type: ignore
 
-from beholder.webapp.models import BlackoutInterval, RecordTime, RTSPURI
-from beholder.webapp.db import db
+from beholder.webapp.models import BlackoutInterval, RecordTime, RTSPURI  # type: ignore
+from beholder.webapp.db import db  # type: ignore
 
 # Blueprint Configuration
 home_bp = Blueprint(

@@ -1,6 +1,6 @@
 """Initialize Flask app."""
 from flask import Flask
-from flask_security import Security, SQLAlchemySessionUserDatastore
+from flask_security import Security, SQLAlchemySessionUserDatastore  # type: ignore
 
 def create_app():
     """Create Flask application."""
@@ -16,7 +16,7 @@ def create_app():
         Security(app, user_datastore)
 
         # Import parts of our application
-        from .home import home
+        from .home import home  # type: ignore
         app.register_blueprint(home.home_bp)
 
         return app

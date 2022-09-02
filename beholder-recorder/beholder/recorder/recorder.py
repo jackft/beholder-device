@@ -110,7 +110,8 @@ class Recorder:
                 )
             )
         uris = set()
-        for id, uri, name in self._uris():
+        for id, uri, name in zip(*self._uris()):
+            _log().debug("%s %s %s", id, uri, name)
             if uri in uris: continue
             uris.add(uri)
             if (check_rtsp_health(uri)):
@@ -131,9 +132,14 @@ class Recorder:
         return pathlib.Path(path) / f"%09d_{source}.{'mka' if only_audio else 'mkv'}"
 
     def _uris(self):
-        ids, uris, names = zip(
-            *self.database_conn.cursor().execute("SELECT id, uri, name FROM rtspuri;")
-        )
+        ids = []
+        uris = []
+        names = []
+        cursor = self.database_conn.cursor()
+        for id, uri, name in cursor.execute("SELECT id, uri, name FROM rtspuri;"):
+            ids.append(id)
+            uris.append(uri)
+            names.append(name)
         return ids, uris, names
 
     def _record_audio_in(self, device, name, out) -> List[str]:

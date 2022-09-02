@@ -1,6 +1,6 @@
-import click
-from flask.cli import with_appcontext
-from flask_sqlalchemy import SQLAlchemy
+import click  # type: ignore
+from flask.cli import with_appcontext  # type: ignore
+from flask_sqlalchemy import SQLAlchemy  # type: ignore
 
 db = SQLAlchemy()
 
