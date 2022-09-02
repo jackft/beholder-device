@@ -1,0 +1,419 @@
+.classifier {
+    width: min-content;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.annotator {
+    width: min-content;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/*************************************/
+/* timeline                          */
+/*************************************/
+
+
+.timeline {
+    width: 100%;
+    border-top: solid black 1px;
+    border-bottom: solid black 1px;
+}
+
+.timeline svg {
+    background: #2c2c32;
+}
+
+.index {
+    stroke-width: 0.5px;
+    stroke: red;
+    stroke-opacity: 0.95;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+.cursor {
+    stroke-width: 1px;
+    stroke: lightgray;
+    stroke-opacity: 0.7;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+g rect.seperator {
+    stroke: #474444;
+    stroke-width: 0.5px;
+    fill: none;
+}
+
+.waveform {
+    fill: #21a3ef;
+}
+
+.instant line:not(.buffer) {
+    stroke: #a0a0a0;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+}
+
+.instant line.buffer {
+    stroke: #a0a0a0;
+    stroke-width: 10px;
+    stroke-opacity: 0;
+    vector-effect: non-scaling-stroke;
+}
+
+.instant.selected line:not(.buffer), .instant:hover line:not(.buffer) {
+    stroke-width: 2px;
+}
+
+.instant.point:hover {
+    cursor: pointer;
+}
+
+.instant path {
+    fill: #a0a0a0;
+}
+
+.interval rect {
+    fill: #21a3ef;
+    opacity: 0.5;
+}
+
+.interval.selected rect {
+    opacity: 0.8;
+}
+
+.interval line:not(.buffer) {
+    stroke: #a0a0a0;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+}
+
+.interval:hover line:not(.buffer), .interval.selected line:not(.buffer) {
+    stroke-width: 2px;
+}
+
+.interval line.buffer {
+    stroke: #a0a0a0;
+    stroke-width: 10px;
+    stroke-opacity: 0;
+    vector-effect: non-scaling-stroke;
+}
+
+.interval text {
+    text-anchor: middle;
+    fill: #f1f1f1;
+    pointer-events: none;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    font-size: 12px;
+}
+
+.offmode {
+    fill-opacity: 0.5;
+    stroke-opacity: 0.5;
+}
+
+.channellabel {
+    background: lightgray;
+    color: #495160;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.class-table {
+    width: 800;
+    margin: 20 auto;
+    padding: 5px;
+    border: 1px solid #222222;
+}
+
+.class-table input {
+    width: 100%;
+}
+
+.class-list-table {
+    max-width: 750px;
+    width: 90%;
+    border: 1px solid #222222;
+    margin: 5 auto;
+    overflow-y: scroll;
+}
+
+.class-list-table > div {
+    height: fit-content;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    color: #495160;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    font-size: 12px;
+    padding-bottom: 3px;
+    display: flex;
+}
+
+.class-list-table > div:hover {
+    background: #f1f1f1;
+}
+
+.class-list-table > div.selected {
+    background: #e1e1e1;
+}
+
+.class-list-table > div div {
+    margin-left: 10px;
+}
+
+.left-col {
+    margin-right: auto;
+}
+
+.right-col {
+    margin-left: auto;
+}
+
+.eventtable {
+    width: 160px;
+    border: 1px solid #222222;
+    margin-left: 6px;
+    overflow-y: scroll;
+}
+
+.eventtable > div {
+    height: fit-content;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    color: #495160;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    font-size: 12px;
+    padding-bottom: 3px;
+}
+
+.eventtable > div:hover {
+    background: #f1f1f1;
+}
+
+.eventtable > div.selected {
+    background: #e1e1e1;
+}
+
+.eventtable > div div {
+    margin-left: 10px;
+}
+
+.eventtable > div div span {
+    font-weight: 600;
+}
+
+.eventtable input:not(.checkbox) {
+    border: none;
+    display: inline;
+    height: auto;
+    width: 95%;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    font-size: 12px;
+    -webkit-appearance: none;
+}
+
+/*************************************/
+/* Mouse                             */
+/*************************************/
+.clickable {cursor: pointer}
+
+
+/*************************************/
+/* State Steps                       */
+/*************************************/
+.progress-steps {
+    display: flex;
+    justify-content: space-evenly;
+    width: 100%;
+}
+
+.progress-steps div {
+    margin: 2px;
+    background: #f1f1f1;
+    width: 100%;
+    text-align: center;
+
+    color: #c9d1e0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.progress-steps div:nth-child(1) {
+    margin-left: 0;
+}
+
+.progress-steps div:last-child {
+    margin-right: 0;
+}
+
+.progress-steps div.current {
+    color: #495160;
+    background: lightgrey;
+}
+
+.progress-steps div.done {
+    background: lightgreen;
+    color: transparent;
+}
+
+/*************************************/
+/* Video State                       */
+/*************************************/
+.vid-state {
+    display: flex;
+    justify-content: space-evenly;
+    font-size: 12px;
+
+    background: #f1f1f1;
+    width: 100%;
+    text-align: left;
+}
+
+.vid-state div {
+    width: 100%;
+    margin-top: 2px;
+    background: lightgray;
+    color: #495160;
+    font-family: Consolas, Monaco, Courier New, monospace;
+    padding-left: 50px;
+}
+
+.vid-state div span {
+    font-weight: 600;
+}
+
+/*************************************/
+/* Keys/Controls References          */
+/*************************************/
+
+.class-ref {
+    display: flex;
+    justify-content: space-between;
+    width: min-content;
+    margin: 0 auto;
+}
+
+.class-ref-item {
+    margin-left: 15px;
+}
+
+.class-ref .class-ref-item:nth-child(1) {
+    margin-left: 0px;
+}
+
+.class-label {
+    text-align: center;
+}
+
+.ctrl-ref-item {
+    display: flex;
+    
+}
+
+.ctrl-label {
+    display: flex;
+    align-items: center;
+    font-size: 10px;
+    color: black;
+    font-family: sans-serif;
+}
+
+.ctrl-key-group {
+    display: flex;
+    width: min-content;
+
+
+}
+
+.ctrl-key-group span {
+    display: flex;
+    align-items: center;
+}
+
+/*************************************/
+/* Keyboard Styling                  */
+/* https://codepen.io/P233/pen/qEagi */
+/*************************************/
+
+.key {
+  background: #f6f6f6;
+  border-color: #ece8e4 #dedad6 #c9c4c4;
+  width: 40px;
+  height: 45px;
+  margin: 2px;
+  border-width: 3px 7px 10px;
+  border-style: solid;
+  border-radius: 4px;
+}
+
+.key .keycap {
+  width: 33px;
+  height: 40px;
+  padding: 5px 0 0 7px;
+  font-size: 18px;
+  line-height: 1;
+  background: #f5f3f1;
+  background: -webkit-linear-gradient(left, #e5e2e1, #f5f3f1, #e5e2e1);
+  background: -moz-linear-gradient(left, #e5e2e1, #f5f3f1, #e5e2e1);
+  background: -ms-linear-gradient(left, #e5e2e1, #f5f3f1, #e5e2e1);
+  background: -o-linear-gradient(left, #e5e2e1, #f5f3f1, #e5e2e1);
+  background: linear-gradient(left, #e5e2e1, #f5f3f1, #e5e2e1);
+  box-shadow: 0 0 10px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  position: relative;
+}
+.keycap {
+  width: inherit;
+  height: inherit;
+  font-size: 15px;
+  line-height: 45px;
+  text-indent: 7px;
+  background: #cdd3de;
+  background: -webkit-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: -moz-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: -ms-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: -o-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  border-radius: 4px;
+  position: relative;
+
+  font-family: 'Average Sans', sans-serif;
+  text-shadow: 0 0 1px rgba(0,0,0,0.1);
+}
+
+.wide-key {
+    width: 66px;
+}
+
+.wide-key .keycap {
+    padding: 0 7px 5px 0;
+    width: 59px;
+    line-height: 45px;
+    text-indent: 7px;
+}
+
+.key.pressed {
+    -webkit-transform: scale(0.95, 0.95);
+    -moz-transform: scale(0.95, 0.95);
+    -ms-transform: scale(0.95, 0.95);
+    -o-transform: scale(0.95, 0.95);
+    transform: scale(0.95, 0.95);
+}
+
+.selected .key {
+  background: #a8aeb8;
+  border-color: #c4c7fc #adb9fc #96a6fd;
+}
+.selected .keycap {
+  background: #cdd3de;
+  background: -webkit-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: -moz-linear-gradient(left, #bbc3f2, #cdd3fe, #bbc3f2);
+  background: -ms-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: -o-linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+  background: linear-gradient(left, #bbc3d2, #cdd3de, #bbc3d2);
+}
+

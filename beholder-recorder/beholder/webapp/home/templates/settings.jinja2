@@ -1,0 +1,113 @@
+{% extends "layout.jinja2" %}
+
+{% block pagestyles %}
+{% endblock %}
+
+{% block content %}
+  {% include "navigation.jinja2" %}
+  <div style="max-width: 500px; margin: auto; margin-bottom: 20px;" class="alert alert-info" role="alert">
+    <h1>Settings</h1>
+    <p></p>
+  </div>
+  <div style="max-width: 500px; margin: auto; margin-bottom: 20px;" class="alert alert-info" role="alert">
+    <h3>{{ hdd_used }} GB used of GB {{ hdd_total }} available</h3>
+    <p></p>
+  </div>
+  <div style="margin: auto; width: 800px;">
+    <h1>Record Time</h1>
+    <div>
+      <div>
+        <input type="checkbox" id="recordTime" name="recordTime" value="yes">
+        <label for="recordTime">Only record during a certain time of day</label><br>
+      </div>
+      <div id="recordTimeContainer">
+        <div>
+          <input type="text" id="record-create-timepicker-start" name="record-create-timepicker-start" class="datetime-ui">
+          <label for="record-create-timepicker-start">Record start time</label><br>
+        </div>
+        <div>
+          <input type="text" id="record-create-timepicker-end" name="record-create-timepicker-end" class="datetime-ui">
+          <label for="record-create-timepicker-end">Record end time</label><br>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(function() {
+      $("#record-create-timepicker-start").timepicker();
+      $("#record-create-timepicker-end").timepicker();
+      let startTime = "{{ recordstart }}".split(":");
+      let s = new Date();
+      s.setUTCHours(startTime[0]);
+      s.setUTCMinutes(startTime[1]);
+      s.setUTCSeconds(0);
+      let start = s.toTimeString().split(" ")[0];
+      
+      let endTime = "{{ recordend }}";
+      endTime = endTime.split(":");
+      let e = new Date();
+      e.setUTCHours(endTime[0]);
+      e.setUTCMinutes(endTime[1]);
+      e.setUTCSeconds(0);
+      let end = e.toTimeString().split(" ")[0];
+      console.log(start);
+      console.log(end);
+
+      $("#record-create-timepicker-start").timepicker("setTime", start)
+      $("#record-create-timepicker-end").timepicker("setTime", end);
+      $("#recordTime").prop("checked", {{ record_time_activated|tojson|safe }});
+      if ($("#recordTime").prop("checked")) {
+        $("#recordTimeContainer").css("display", "block");
+      } else {
+        $("#recordTimeContainer").css("display", "none");
+      }
+    });
+    ////////////////////////////////////////////////////////////////////////////
+    function updateRecordDB(checked, start, end, offset) {
+      console.log(start, end, offset);
+      const data = {
+        "activated": checked,
+        "start": start,
+        "end": end,
+        "offset": offset
+      };
+      $.ajax({
+        type: "PUT",
+        url: "/settings/recordtime",
+        data: JSON.stringify(data),
+        success: (data) => {
+          console.log(data);
+        },
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+      });
+    };
+
+    $("#recordTime").change(function() {
+      const checked = $(this).prop("checked");
+      if (checked) {
+        $("#recordTimeContainer").css("display", "block");
+      } else {
+        $("#recordTimeContainer").css("display", "none");
+      }
+      const start = $("#record-create-timepicker-start").val();
+      const end = $("#record-create-timepicker-end").val();
+      const offset = (new Date()).getTimezoneOffset();
+      updateRecordDB(checked, start, end, offset);
+    });
+    $("#record-create-timepicker-start").change(function() {
+      const checked = $("#recordTime").prop("checked");
+      const start = $("#record-create-timepicker-start").val();
+      const end = $("#record-create-timepicker-end").val();
+      const offset = (new Date()).getTimezoneOffset();
+      updateRecordDB(checked, start, end, offset);
+    });
+    $("#record-create-timepicker-end").change(function() {
+      const checked = $("#recordTime").prop("checked");
+      const start = $("#record-create-timepicker-start").val();
+      const end = $("#record-create-timepicker-end").val();
+      const offset = (new Date()).getTimezoneOffset();
+      updateRecordDB(checked, start, end, offset);
+    });
+  </script>
+{% endblock %}

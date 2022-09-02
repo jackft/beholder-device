@@ -1,0 +1,471 @@
+{% extends "layout.jinja2" %}
+
+{% block pagestyles %}
+{% endblock %}
+
+{% block content %}
+  {% include "navigation.jinja2" %}
+  <div style="max-width: 500px; margin: auto; margin-bottom: 20px;" class="alert alert-info" role="alert">
+    <h1>Privacy Ranges</h1>
+    <p>Click on the calendar to create a span of time you would like to not record/delete data from.</p>
+  </div>
+  <div class="container">
+    <div id="calendar" style="width: 75%; margin: auto; margin-bottom: 20px;"></div>
+  </div>
+  <div class="container">
+    <table id="tasksTable" class="w-100 display mywide">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+      <script>
+
+      const events = {{ events|tojson|safe }};
+
+      function addEvent(newEvent) {
+        $.ajax({
+          type: "POST",
+          url: "/events",
+          data: JSON.stringify(newEvent),
+          success: (data) => {
+            event = calendar.addEvent(newEvent);
+            event.setProp("id", data.id)
+          },
+          dataType: "json",
+          contentType: "application/json; charset=utf-8",
+        });
+      };
+
+      function updateEvent(editInfo, event) {
+        $.ajax({
+          type: "PUT",
+          url: `/events/${editInfo.event.id}`,
+          data: JSON.stringify(event),
+          success: () => {
+            editInfo.event.setStart(event.start);
+            editInfo.event.setEnd(event.end);
+            editInfo.event.setProp("title", event.title);
+          },
+          dataType: "json",
+          contentType: "application/json; charset=utf-8",
+          dataType: "json"
+        });
+      };
+
+      function deleteEvent(eventInfo) {
+        $.ajax({
+          type: "DELETE",
+          url: `/events/${eventInfo.event.id}`,
+          success: () => {eventInfo.event.remove()},
+        });
+      };
+
+      let calendar = null;
+      let createInfo = null;
+      let editInfo = null;
+      let create_time_start_allday = true;
+      let create_time_end_allday = true;
+      let edit_time_start_allday = true;
+      let edit_time_end_allday = true;
+      let createEventModal = new tingle.modal({
+        footer: true,
+        stickyFooter: false,
+        closeMethods: ['overlay', 'button', 'escape'],
+        closeLabel: "Close",
+        cssClass: ['custom-class-1', 'custom-class-2'],
+        onOpen: function() {
+          off_create_timepicker_end();
+          off_create_timepicker_start();
+          let end = new Date(createInfo.end)
+          end.setDate(createInfo.end.getDate() - 1);
+          $("#create-datepicker-start" ).datepicker("setDate", createInfo.startStr);
+          $("#create-timepicker-start").timepicker("setTime", "12:00am");
+          $("#create-datepicker-end" ).datepicker("setDate", end.toISOString().split('T')[0]);
+          $("#create-timepicker-end").timepicker("setTime", "12:00am");
+          $("#create-name").val("");
+        },
+        onClose: function() {
+        },
+        beforeClose: function() {
+          return true;
+        }
+      });
+
+      function on_create_timepicker_end() {
+        create_time_end_allday = false;
+        $("#create-timepicker-end-container-enable").css("display", "none");
+        $("#create-timepicker-end-container").css("display", "block");
+        $("#create-timepicker-end").timepicker("setTime", "6:00pm");
+      }
+      function off_create_timepicker_end() {
+        create_time_end_allday = true;
+        $("#create-timepicker-end-container-enable").css("display", "block");
+        $("#create-timepicker-end-container").css("display", "none");
+        $("#create-timepicker-end").timepicker("setTime", "end of day");
+      }
+      function on_create_timepicker_start() {
+        create_time_start_allday = false;
+        $("#create-timepicker-start-container-enable").css("display", "none");
+        $("#create-timepicker-start-container").css("display", "block");
+        $("#create-timepicker-start").timepicker("setTime", "12:00am");
+      }
+      function off_create_timepicker_start() {
+        create_time_start_allday = true;
+        $("#create-timepicker-start-container-enable").css("display", "block");
+        $("#create-timepicker-start-container").css("display", "none");
+        $("#create-timepicker-start").timepicker("setTime", "start of day");
+      }
+      // set content
+      createEventModal.setContent(`
+          <label>start</label>
+          <br>
+          <div class="tingle-line-flex">
+            <div>
+              <input type="text" id="create-datepicker-start" class="datetime-ui">
+            </div>
+            <div id="create-timepicker-start-container">
+              <input type="text" id="create-timepicker-start" class="datetime-ui">
+              <button onclick="off_create_timepicker_start()">start of day</button>
+            </div>
+            <div id="create-timepicker-start-container-enable">
+              <button onclick="on_create_timepicker_start()">specify time</button>
+            </div>
+          </div>
+          <br>
+          <br>
+          <label>end</label>
+          <br>
+          <div class="tingle-line-flex">
+            <div>
+              <input type="text" id="create-datepicker-end" class="datetime-ui">
+            </div>
+            <div id="create-timepicker-end-container">
+              <input type="text" id="create-timepicker-end" class="datetime-ui">
+              <button onclick="off_create_timepicker_end()">end of day</button>
+            </div>
+            <div id="create-timepicker-end-container-enable">
+              <button onclick="on_create_timepicker_end()">specify time</button>
+            </div>
+          </div>
+          <br>
+          <br>
+          <label>name</label>
+          <br>
+          <input type="text" id="create-name">
+          <br>
+          <br>
+          <span id="create-message"></span>
+      `);
+      $(function() {
+        const dp = $("#create-datepicker-start");
+        dp.datepicker();
+        dp.datepicker( "option", "dateFormat", "yy-mm-dd");
+      });
+      $(function() {$("#create-timepicker-start").timepicker()});
+      $(function() {
+        const dp = $("#create-datepicker-end");
+        dp.datepicker();
+        dp.datepicker( "option", "dateFormat", "yy-mm-dd");
+      });
+      $(function() {$("#create-timepicker-end").timepicker()});
+
+      // add a button
+      createEventModal.addFooterBtn('create', 'tingle-btn tingle-btn--primary', function() {
+          // here goes some logic
+
+          let csd = $("#create-datepicker-start").val();
+          let ced = $("#create-datepicker-end").val();
+          let cst = $("#create-timepicker-start").val();
+          let cet = $("#create-timepicker-start").val();
+
+          let incomplete = false;
+          let message = "*";
+          if ($("#create-name").val() == null || $("#create-name").val() == "") {
+            message += "name requred."
+            incomplete = true;
+          }
+          if ($("#create-datepicker-start").val() == null || $("#create-datepicker-start").val() == "") {
+            message += " start date required."
+            incomplete = true;
+          }
+          if ($("#create-datepicker-end").val() == null || $("#create-datepicker-end").val() == "") {
+            message += " end date required."
+            incomplete = true;
+          }
+          if (create_time_start_allday) {
+            $("#create-timepicker-start").timepicker("setTime", "12:00am");
+          }
+          else if ($("#create-timepicker-start").val() == null || $("#create-timepicker-start").val() == "") {
+            message += " start time required."
+            incomplete = true;
+          }
+          if (create_time_end_allday) {
+            $("#create-timepicker-end").timepicker("setTime", "12:00am");
+            const end = $("#create-timepicker-end").timepicker("getTime", Date.parse($("#create-datepicker-end").val()+"T00:00:01"))
+            end.setDate(createInfo.end.getDate() + 0);
+            $("#create-datepicker-end" ).datepicker("setDate", end.toISOString().split('T')[0]);
+          }
+          else if ($("#create-timepicker-end").val() == null || $("#create-timepicker-end").val() == "") {
+            message += " end time required."
+            incomplete = true;
+          }
+          const startDT = $("#create-timepicker-start").timepicker("getTime", Date.parse($("#create-datepicker-start").val()+"T00:00:01"));
+          const endDT = $("#create-timepicker-end").timepicker("getTime", Date.parse($("#create-datepicker-end").val()+"T00:00:01"));
+          if (startDT >= endDT) {
+            message += " end time must be greater than start time.";
+            incomplete = true;
+          }
+          if (incomplete) {
+            $("#create-message").text(message);
+            $("#create-datepicker-start").val(csd);
+            $("#create-datepicker-end").val(ced);
+            $("#create-timepicker-start").val(cst);
+            $("#create-timepicker-start").val(cet);
+            return;
+          }
+          $("#create-message").text("");
+          const newEvent = {
+            "start": startDT,
+            "end": endDT,
+            "title": $("#create-name").val() || "",
+          };
+          addEvent(newEvent);
+          createEventModal.close();
+      });
+
+
+      // add another button
+      createEventModal.addFooterBtn('cancel', 'tingle-btn tingle-btn--danger tingle-btn--pull-right', function() {
+          // here goes some logic
+          createEventModal.close();
+      });
+
+      // open modal
+      function onDateSelect(info) {
+        createInfo = info;
+        createEventModal.open();
+        //alert('selected ' + info.startStr + ' to ' + info.endStr);
+      }
+
+      let editEventModal = new tingle.modal({
+        footer: true,
+        stickyFooter: false,
+        closeMethods: ['overlay', 'button', 'escape'],
+        closeLabel: "Close",
+        cssClass: ['custom-class-1', 'custom-class-2'],
+        onOpen: function() {
+          if (editInfo.event.start.toLocaleTimeString() === "12:00:00 AM")
+            off_edit_timepicker_start();
+          else
+            on_edit_timepicker_start();
+
+          let end = new Date(editInfo.event.end)
+          if (editInfo.event.end.toLocaleTimeString() === "12:00:00 AM") {
+            off_edit_timepicker_end();
+            end.setDate(editInfo.event.end.getDate() - 1);
+          }
+          else
+            on_edit_timepicker_end();
+
+          $("#edit-datepicker-start" ).datepicker("setDate", editInfo.event.start.toISOString().split('T')[0]);
+          $("#edit-timepicker-start").timepicker("setTime", editInfo.event.start.toLocaleTimeString());
+          $("#edit-datepicker-end" ).datepicker("setDate", end.toISOString().split('T')[0]);
+          $("#edit-timepicker-end").timepicker("setTime", editInfo.event.end.toLocaleTimeString());
+          $("#edit-name").val(editInfo.event.title);
+        },
+        onClose: function() {
+        },
+        beforeClose: function() {
+          return true;
+        }
+      });
+
+      // set content
+
+      function on_edit_timepicker_end() {
+        edit_time_end_allday = false;
+        $("#edit-timepicker-end-container-enable").css("display", "none");
+        $("#edit-timepicker-end-container").css("display", "block");
+        $("#edit-timepicker-end").timepicker("setTime", "6:00pm");
+      }
+      function off_edit_timepicker_end() {
+        edit_time_end_allday = true;
+        $("#edit-timepicker-end-container-enable").css("display", "block");
+        $("#edit-timepicker-end-container").css("display", "none");
+        $("#edit-timepicker-end").timepicker("setTime", "");
+      }
+      function on_edit_timepicker_start() {
+        edit_time_start_allday = false;
+        $("#edit-timepicker-start-container-enable").css("display", "none");
+        $("#edit-timepicker-start-container").css("display", "block");
+        $("#edit-timepicker-start").timepicker("setTime", "12:00am");
+      }
+      function off_edit_timepicker_start() {
+        edit_time_start_allday = true;
+        $("#edit-timepicker-start-container-enable").css("display", "block");
+        $("#edit-timepicker-start-container").css("display", "none");
+        $("#edit-timepicker-start").timepicker("setTime", "");
+      }
+      editEventModal.setContent(`
+
+          <label>start</label>
+          <br>
+          <div class="tingle-line-flex">
+            <div>
+              <input type="text" id="edit-datepicker-start" class="datetime-ui">
+            </div>
+            <div id="edit-timepicker-start-container">
+              <input type="text" id="edit-timepicker-start" class="datetime-ui">
+              <button onclick="off_edit_timepicker_start()">start of day</button>
+            </div>
+            <div id="edit-timepicker-start-container-enable">
+              <button onclick="on_edit_timepicker_start()">specify time</button>
+            </div>
+          </div>
+          <br>
+          <br>
+          <label>end</label>
+          <br>
+          <div class="tingle-line-flex">
+            <div>
+              <input type="text" id="edit-datepicker-end" class="datetime-ui">
+            </div>
+            <div id="edit-timepicker-end-container">
+              <input type="text" id="edit-timepicker-end" class="datetime-ui">
+              <button onclick="off_edit_timepicker_end()">end of day</button>
+            </div>
+            <div id="edit-timepicker-end-container-enable">
+              <button onclick="on_edit_timepicker_end()">specify time</button>
+            </div>
+          </div>
+          <br>
+          <br>
+          <label>name</label>
+          <br>
+          <input type="text" id="edit-name">
+          <br>
+          <br>
+          <span id="edit-message"></span>
+      `);
+      $(function() {
+        const dp = $("#edit-datepicker-start");
+        dp.datepicker();
+        dp.datepicker( "option", "dateFormat", "yy-mm-dd");
+      });
+      $(function() {$("#edit-timepicker-start").timepicker()});
+      $(function() {
+        const dp = $("#edit-datepicker-end");
+        dp.datepicker();
+        dp.datepicker( "option", "dateFormat", "yy-mm-dd");
+      });
+      $(function() {$("#edit-timepicker-end").timepicker()});
+
+      editEventModal.addFooterBtn('edit', 'tingle-btn tingle-btn--primary', function() {
+          // here goes some logic
+
+          let esd = $("#edit-datepicker-start").val();
+          let eed = $("#edit-datepicker-end").val();
+          let est = $("#edit-timepicker-start").val();
+          let eet = $("#edit-timepicker-start").val();
+
+          let incomplete = false;
+          let message = "*";
+          if ($("#edit-name").val() == null || $("#edit-name").val() == "") {
+            message += "name requred."
+            incomplete = true;
+          }
+          if (edit_time_start_allday) {
+            $("#edit-timepicker-start").timepicker("setTime", "12:00am");
+          }
+          else if ($("#edit-datepicker-start").val() == null || $("#edit-datepicker-start").val() == "") {
+            message += " start date required."
+            incomplete = true;
+          }
+          console.log("HI");
+          console.log($("#edit-timepicker-end").val());
+          console.log($("#edit-datepicker-end").val());
+          console.log(editInfo.event.end.getDate());
+          if (edit_time_end_allday) {
+            $("#edit-timepicker-end").timepicker("setTime", "12:00am");
+            const end = $("#edit-timepicker-end").timepicker("getTime", Date.parse($("#edit-datepicker-end").val()+"T00:00:00"))
+            end.setDate((new Date(Date.parse($("#edit-datepicker-end").val()+"T00:00:00"))).getDate() + 1);
+            $("#edit-datepicker-end" ).datepicker("setDate", end.toISOString().split('T')[0]);
+            console.log($("#edit-timepicker-end").val());
+            console.log($("#edit-datepicker-end").val());
+          }
+          else if ($("#edit-datepicker-end").val() == null || $("#edit-datepicker-end").val() == "") {
+            message += " end date required."
+            incomplete = true;
+          }
+          if ($("#edit-timepicker-start").val() == null || $("#edit-timepicker-start").val() == "") {
+            message += " start time required."
+            incomplete = true;
+          }
+          if ($("#edit-timepicker-end").val() == null || $("#edit-timepicker-end").val() == "") {
+            message += " end time required."
+            incomplete = true;
+          }
+          const startDT = $("#edit-timepicker-start").timepicker("getTime", Date.parse($("#edit-datepicker-start").val()+"T00:00:00"));
+          const endDT = $("#edit-timepicker-end").timepicker("getTime", Date.parse($("#edit-datepicker-end").val()+"T00:00:00"));
+          if (startDT >= endDT) {
+            message += " end time must be greater than start time.";
+            incomplete = true;
+          }
+          if (incomplete) {
+            $("#edit-message").text(message);
+            $("#edit-message").text(message);
+            $("#edit-datepicker-start").val(esd);
+            $("#edit-datepicker-end").val(eed);
+            $("#edit-timepicker-start").val(est);
+            $("#edit-timepicker-start").val(eet);
+            return;
+          }
+          $("#edit-message").text("");
+          const event = {
+            "start": startDT,
+            "end": endDT,
+            "title": $("#edit-name").val() || "",
+          };
+          updateEvent(editInfo, event);
+          editEventModal.close();
+      });
+
+      // add another button
+      editEventModal.addFooterBtn('cancel', 'tingle-btn tingle-btn--danger tingle-btn--pull-right', function() {
+          // here goes some logic
+          editEventModal.close();
+      });
+
+      editEventModal.addFooterBtn('delete', 'tingle-btn tingle-btn--danger', function() {
+          // here goes some logic
+          deleteEvent(editInfo);
+          editEventModal.close();
+      });
+
+      // open modal
+      function onEventSelect(info) {
+        editInfo = info;
+        editEventModal.open();
+      }
+
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth',
+          selectable: true,
+          events: events,
+          eventClick: onEventSelect,
+          select: onDateSelect,
+          displayEventEnd: true,
+          eventTimeFormat: {
+            hour: 'numeric',
+            minute: '2-digit',
+            meridiem: "short"
+          }
+        });
+        calendar.render();
+      });
+
+    </script>
+{% endblock %}

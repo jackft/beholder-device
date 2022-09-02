@@ -1,0 +1,59 @@
+.navbar .navbar-nav {
+    display: inline-block;
+    float: none;
+}
+
+.navbar .navbar-collapse {
+    text-align: center;
+}
+
+#create-message {
+    color: red;
+}
+
+.tingle-line-flex {
+    display: flex;
+}
+
+.tingle-line-flex > div {
+    margin: 2px;
+}
+
+.datetime-ui {
+    width: 7em;
+}
+
+.fc-event{
+    cursor: pointer;
+}
+
+/**********/
+.tct-progress-bar-wrapper {
+    border: 1px solid #ccc!important;
+}
+
+
+.tct-progress-bar {
+    height: 10px;
+}
+
+/**********/
+.green {
+    background: green;
+}
+
+.blue {
+    background: blue;
+}
+
+.red {
+    background: red;
+}
+
+.yellow {
+    background: yellow;
+}
+
+.black {
+    background: black;
+}
