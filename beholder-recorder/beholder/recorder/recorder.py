@@ -19,6 +19,7 @@ import psutil  # type: ignore
 import pulsectl  # type: ignore
 import requests  # type: ignore
 
+from .interval import RecordTime, IntervalCollection
 from .utils import pathify, _log
 
 def check_rtsp_health(uri: str) -> bool:
@@ -330,12 +331,15 @@ class Controller:
         self.bad_consecutive_health_check_counter = 0
         self.bad_health_check_threshold = 0
 
+        self.interval_collection: Optional[IntervalCollection] = self.refresh_interval_collection()
+        self.record_times: Optional[RecordTime] = self.refresh_record_times()
+
         # stateful things
         multiprocessing_logging.install_mp_handler()
         self.upload_pool = Pool(max_workers=1)
         self.upload_future: Optional[Future] = None
 
-        self.uris = self.get_uris()
+        self.uris = self.get_uris()[1]
 
     @staticmethod
     def from_file(config_path):
@@ -356,15 +360,25 @@ class Controller:
     def run(self):
         while True:
             _log().debug("running loop")
-
+            self.interval_collection = self.refresh_interval_collection()
+            self.record_times = self.refresh_record_times()
+            now = datetime.datetime.now()
+            can_record = not self.is_blackout_datetime(now) and self.is_record_time(now)
+            if not can_record:
+                _log().debug("cannot record")
+                Controller.kill_gstreamer().wait(timeout=5)
+            else:
+                _log().debug("can record")
             if Controller.space_remaining() > self.available_space_threshold:
                 if (
-                    self.recorder_process is None or
-                    self.recorder_process.poll() is not None or
-                    self.uris_changed()
+                    can_record and (
+                        self.recorder_process is None or
+                        self.recorder_process.poll() is not None or
+                        self.uris_changed()
+                    )
                 ):
                     self.record()
-                else:
+                elif can_record:
                     self.handle_recorder_health()
 
             if Controller.check_wifi():
@@ -388,18 +402,24 @@ class Controller:
         return available_bytes
 
     def get_uris(self):
-        ids, uris, names = zip(
-            *self.database_conn.cursor().execute("SELECT id, uri, name FROM rtspuri;")
-        )
+        ids = []
+        uris = []
+        names = []
+        cursor = self.database_conn.cursor()
+        for id, uri, name in cursor.execute("SELECT id, uri, name FROM rtspuri;"):
+            ids.append(id)
+            uris.append(uri)
+            names.append(name)
         return ids, uris, names
 
     def uris_changed(self):
-        new_uris = self.get_uris()
+        _, new_uris, _ = self.get_uris()
         old_uris = self.uris
-
+        _log().debug("old uris: %s", "".join(x for x in sorted(old_uris)))
+        _log().debug("new uris: %s", "".join(x for x in sorted(new_uris)))
         return (
             "".join(x[1] for x in sorted(new_uris, key=lambda x: x[1]))
-            ==
+            !=
             "".join(x[1] for x in sorted(old_uris, key=lambda x: x[1]))
         )
 
@@ -422,23 +442,63 @@ class Controller:
                 _log().debug("uploaded %s videos", uploaded_files)
 
     def record(self):
+        _log().debug("stopping any recorder")
+        Controller.kill_gstreamer().wait(timeout=5)
         _log().debug("starting recorder")
-        p = subprocess.Popen(["killall", "gst-launch-1.0"])
-        p.wait()
         time.sleep(5)
         self.recorder_process = self.recorder.run(now=True)
+
+    @staticmethod
+    def kill_gstreamer():
+        return subprocess.Popen(["killall", "gst-launch-1.0"])
+
+    @staticmethod
+    def super_kill_gstreamer():
+        return subprocess.Popen(["killall", "-9", "gst-launch-1.0"])
 
     def handle_recorder_health(self):
         if self.recorder_health_checker is None:
             self.recorder_health_checker = RecordProcessHealthChecker(self.recorder_process)
         is_healthy = self.recorder_health_checker.check()
-        if is_healthy: return
+        if is_healthy:
+            self.bad_consecutive_health_check_counter = 0
+            return
+        _log().warn("health check: haulted %d times", self.bad_consecutive_health_check_counter)
         self.bad_consecutive_health_check_counter += 1
         if self.bad_consecutive_health_check_counter > self.bad_health_check_threshold:
             subprocess.Popen(["reboot"])
-            self.bad_consecutive_health_check_counter = 0
         else:
-            subprocess.Popen(["killall", "gst-launch-1.0"])
+            Controller.super_kill_gstreamer().wait(timeout=5)
+
+    # handle record times
+
+    def refresh_interval_collection(self):
+        icol = None
+        if self.database_conn is not None:
+            icol = IntervalCollection.from_sql(self.database_conn.cursor())
+        return icol
+
+    def refresh_record_times(self):
+        icol = None
+        if self.database_conn is not None:
+            icol = RecordTime.from_sql(self.database_conn.cursor())
+        return icol
+
+    def is_blackout_datetime(self, dt: datetime.datetime) -> bool:
+        if self.interval_collection is not None:
+            is_blackout = self.interval_collection.point_overlaps(dt)
+            _log().debug("record: %s", is_blackout)
+            return is_blackout
+        return False
+
+    def is_record_time(self, dt: datetime.datetime) -> bool:
+        if self.record_times is not None:
+            if len(self.record_times.intervals) == 0:
+                return True
+            is_record = self.record_times.point_overlaps(dt.time())
+            _log().debug("record: %s", is_record)
+            return is_record
+        return True
 
 
 class RecordProcessHealthChecker:
@@ -453,6 +513,7 @@ class RecordProcessHealthChecker:
         open_files = {open_file.path: open_file for open_file in self.process.open_files()}
         if self.open_files is None:
             self.open_files = open_files
+            _log().debug("health checker: new files")
             return True
 
         flag = False
@@ -463,11 +524,14 @@ class RecordProcessHealthChecker:
                 old_position = open_file.position
                 new_position = open_files[path].position
                 if old_position != new_position:
+                    _log().debug("health checker: writing to file")
                     flag = True
                     break
             # probably moved on to a different file to write
             else:
+                _log().debug("health checker: probably writing new files")
                 flag = True
+                break
 
         self.open_files = open_files
         return flag
