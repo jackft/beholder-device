@@ -1,0 +1,338 @@
+{% extends "layout.jinja2" %}
+
+{% block pagestyles %}
+{% endblock %}
+
+{% block content %}
+  {% include "navigation.jinja2" %}
+  <div style="max-width: 500px; margin: auto; margin-bottom: 20px;" class="alert alert-info" role="alert">
+    <h1>RTSP Cameras</h1>
+    <p>Here you can let the device know about rtsp cameras you have set up.</p>
+  </div>
+  <div class="container" style="margin-bottom: 25px">
+    <div id="list" class="container" style="max-width: 75%"></div>
+    <button type="button" class="btn btn-primary btn-lg btn-block" onclick=createPanel()>New Camera</button>
+  </div>
+  <script>
+    const listDiv = document.querySelector("#list");
+
+    let panels = [];
+
+    class Panel {
+      constructor(parent, id, name, uri) {
+        this.parent = parent
+        this.id = id
+        this.name = name
+        this.uri = uri
+
+        this.panel = null;
+        this.uriInput = null;
+        this.nameInput = null;
+        this.addButton = null;
+        this.deleteButton = null;
+        this.testButton = null;
+        this.warning = null;
+        this.addedStatus = null;
+        this.validated = null;
+        this.img = null;
+
+        this.init();
+
+        const _this = this;
+        this.uriInput.oninput = function() {
+          _this.uri = this.value;
+          _this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-remove");
+          _this.addedStatus.style.color = "black";
+        }
+        this.nameInput.oninput = function() {
+          _this.name = this.value;
+          _this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-remove");
+          _this.addedStatus.style.color = "black";
+        }
+        this.addButton.onclick = () => this.add();
+        this.deleteButton.onclick = () => this.delete();
+        this.testButton.onclick = () => this.test();
+
+        if (this.uri != null) {
+          this.test();
+        }
+        panels.push(this);
+      }
+
+      init() {
+        const panel = document.createElement("div");
+        panel.setAttribute("class", "panel panel-default");
+        this.panel = panel;
+
+        const panelHeading = document.createElement("div");
+        panelHeading.setAttribute("class", "panel-heading");
+        panel.appendChild(panelHeading);
+        const headerP = document.createElement("span");
+        panelHeading.appendChild(headerP);
+        const panelHeader = document.createElement("span");
+        panelHeader.innerHTML = '<h3 style="display: inline">RTSP Cam</h3>'
+        headerP.appendChild(panelHeader);
+        const addedStatus = document.createElement("span");
+        addedStatus.style.marginLeft = "20px";
+        if (this.id == null) {
+          addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-remove");
+          addedStatus.style.color = "red";
+        } else {
+          addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-saved");
+          addedStatus.style.color = "green";
+        }
+        headerP.appendChild(addedStatus);
+        this.addedStatus = addedStatus;
+
+        const panelBody = document.createElement("div");
+        panelBody.setAttribute("class", "panel-body");
+        panel.appendChild(panelBody);
+
+        const inputGroup1 = document.createElement("div");
+        inputGroup1.setAttribute("class", "input-group");
+        panelBody.appendChild(inputGroup1);
+        const span1 = document.createElement("span");
+        span1.setAttribute("class", "input-group-addon");
+        span1.setAttribute("id", "basic-addon1");
+        span1.innerText = "rtsp uri";
+        inputGroup1.appendChild(span1);
+
+        const input1 = document.createElement("input");
+        input1.setAttribute("type", "text");
+        input1.setAttribute("class", "form-control");
+        input1.setAttribute("placeholder", "rtsp://username:password@192.168.0.102/live0");
+        input1.setAttribute("aria-describedby", "basic-addon1");
+        if (this.uri !== null) {
+          input1.setAttribute("value", this.uri);
+        }
+        inputGroup1.appendChild(input1);
+        panelBody.appendChild(document.createElement("br"));
+        this.uriInput = input1;
+
+
+        const inputGroup2 = document.createElement("div");
+        inputGroup2.setAttribute("class", "input-group");
+        panelBody.appendChild(inputGroup2);
+        const span2 = document.createElement("span");
+        span2.setAttribute("class", "input-group-addon");
+        span2.setAttribute("id", "basic-addon2");
+        span2.innerText = "name";
+        inputGroup2.appendChild(span2);
+
+        const input2 = document.createElement("input");
+        input2.setAttribute("type", "text");
+        input2.setAttribute("class", "form-control");
+        input2.setAttribute("aria-describedby", "basic-addon2");
+        input2.setAttribute("placeholder", "overhead");
+        if (this.name !== null) {
+          input2.setAttribute("value", this.name);
+        }
+        inputGroup2.appendChild(input2);
+        panelBody.appendChild(document.createElement("br"));
+        this.nameInput = input2;
+
+        const buttonContainer = document.createElement("p");
+        panelBody.appendChild(buttonContainer);
+
+
+        const addButton = document.createElement("button");
+        addButton.setAttribute("type", "button");
+        addButton.setAttribute("class", "btn btn-primary btn-lg active");
+        addButton.innerText ="Add";
+        addButton.style.marginRight = "5px";
+        buttonContainer.appendChild(addButton);
+        this.addButton = addButton;
+
+        const deleteButton = document.createElement("button");
+        deleteButton.setAttribute("type", "button");
+        deleteButton.setAttribute("class", "btn btn-danger btn-lg active");
+        deleteButton.innerText ="Delete";
+        deleteButton.style.marginRight = "5px";
+        buttonContainer.appendChild(deleteButton);
+        this.deleteButton = deleteButton;
+
+        const testButton = document.createElement("button");
+        testButton.setAttribute("type", "button");
+        testButton.setAttribute("class", "btn btn-default btn-lg active");
+        testButton.innerText = "Test";
+        testButton.style.marginRight = "5px";
+        buttonContainer.appendChild(testButton);
+        this.testButton = testButton;
+
+        this.img = document.createElement("img");
+        this.img.style.maxWidth = "100%";
+        panelBody.appendChild(this.img);
+
+        this.warning = document.createElement("div");
+        this.warning.setAttribute("class", "alert alert-danger");
+        this.warning.setAttribute("role", "alert");
+        this.warning.style.display = "none";
+        panelBody.appendChild(this.warning);
+
+        this.parent.appendChild(panel);
+
+        // check to see if uri is valid
+        const validated = document.createElement("span");
+        validated.style.marginLeft = "20px";
+        validated.style.display = "none";
+        headerP.appendChild(validated);
+        this.validated = validated;
+      }
+
+      add() {
+        if (this.uri != null && this.name != null) {
+          if (this.id == null) {
+            $.ajax({
+              type: "POST",
+              url: `/rtspuri?cache=${(+new Date).toString(36)}`,
+              data: JSON.stringify({
+                uri: this.uri,
+                name: this.name,
+              }),
+              success: (data) => {
+                this.id = data.id;
+                this.warning.style.display = "none";
+
+                this.addedStatus.innerText = "";
+                this.addedStatus.style.color = "green";
+                this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-saved");
+              },
+              error: (data) => {
+                this.warning.style.display = "block";
+                if ("error" in data.responseJSON && data.responseJSON.error === "duplicate host") {
+                  this.warning.innerText = "camera with ip already exists";
+                } else {
+                  this.warning.innerText = "please enter a valid uri or name";
+                }
+              },
+              dataType: "json",
+              contentType: "application/json; charset=utf-8",
+            });
+          } else {
+            $.ajax({
+              type: "PUT",
+              url: `/rtspuri/${this.id}?cache=${(+new Date).toString(36)}`,
+              data: JSON.stringify({
+                id: this.id,
+                uri: this.uri,
+                name: this.name
+              }),
+              success: (data) => {
+                this.id = data.id;
+                this.warning.style.display = "none";
+
+                this.addedStatus.innerText = "";
+                this.addedStatus.style.color = "green";
+                this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-saved");
+              },
+              error: (data) => {
+                this.warning.style.display = "block";
+                if ("error" in data.responseJSON && data.responseJSON.error === "duplicate host") {
+                  this.warning.innerText = "camera with ip already exists";
+                } else {
+                  this.warning.innerText = "please enter a valid uri or name";
+                }
+              },
+              dataType: "json",
+              contentType: "application/json; charset=utf-8",
+            });
+          }
+        } else {
+          this.warning.style.display = "block";
+          this.warning.innerText = "please enter a uri or name";
+        }
+      }
+
+      delete() {
+        if (this.id !== null) {
+          $.ajax({
+            type: "DELETE",
+            url: `/rtspuri/${this.id}`,
+            data: JSON.stringify({
+              uri: this.uri,
+              name: this.name,
+            }),
+            success: (data) => {
+              this.panel.remove();
+              this.id = data.id;
+              this.warning.style.display = "none";
+            },
+            error: (data) => {
+              this.warning.style.display = "block";
+              this.warning.innerText = "something went wrong";
+            },
+            dataType: "json",
+            contentType: "application/json; charset=utf-8",
+          });
+        } else {
+          this.panel.remove();
+        }
+      }
+
+      test() {
+        if (this.uri == null) {
+          this.warning.style.display = "block";
+          this.warning.innerText = "please enter a uri";
+          return;
+        }
+ 
+        this.validated.setAttribute("class", "glyphicon glyphicon-hourglass");
+        this.validated.style.color = "black";
+        this.validated.style.display = "inline";
+
+        $.ajax({
+          type: "POST",
+          url: "/test_rtsp_uri",
+          data: JSON.stringify({
+            uri: this.uri,
+            id: this.id
+          }),
+          success: (data) => {
+            this.img.src = `data:image/jpeg;base64,${data}`;
+            this.warning.style.display = "none";
+            this.validated.setAttribute("class", "glyphicon glyphicon-ok");
+            this.validated.style.color = "green";
+            this.validated.style.display = "inline";
+          },
+          error: (data) => {
+            this.img.src = null;
+            this.warning.style.display = "inline";
+            this.warning.innerText = "something went wrong. Double check the uri.";
+            this.validated.setAttribute("class", "glyphicon glyphicon-remove");
+            this.validated.style.color = "red";
+            this.validated.style.display = "inline";
+          },
+          contentType: "application/json; charset=utf-8",
+        });
+      }
+    }
+
+    function initialize(data) {
+      if (data.length == 0) {
+        const panel = new Panel(listDiv, null, null, null);
+      }
+      data.forEach(data => {
+        const panel = new Panel(listDiv, data.id, data.name, data.uri);
+      });
+    }
+
+    function createPanel() {
+        const panel = new Panel(listDiv, null, null, null);
+    }
+
+    $.ajax({
+      type: "GET",
+      url: "/rtspuri",
+      success: (data) => {
+        initialize(data);
+      },
+      dataType: "json",
+      contentType: "application/json; charset=utf-8",
+    });
+
+    function addNewCameraElement() {
+      
+    }
+
+  </script>
+{% endblock %}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>{{ title }} | Theycantalk Web Tools</title>
+  <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.png') }}" type="image/x-icon"/>
+
+  <script src="https://code.jquery.com/jquery-3.0.0.js" ></script>
+  <script src="https://code.jquery.com/jquery-migrate-3.3.0.js" ></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.css" />
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.js" ></script>
+
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" type="text/css">
+
+  <script src="{{ url_for('static', filename='js/fullcalendar/main.js') }}" ></script>
+  <link href="{{ url_for('static', filename='css/fullcalendar/main.css') }}" rel="stylesheet" type="text/css">
+
+  <script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}" ></script>
+  <link href="{{ url_for('static', filename='css/jquery-ui.min.css') }}" rel="stylesheet" type="text/css">
+
+  <script src="{{ url_for('static', filename='js/jquery.timepicker.js') }}" ></script>
+  <link href="{{ url_for('static', filename='css/jquery.timepicker.css') }}" rel="stylesheet" type="text/css">
+
+  <script src="{{ url_for('static', filename='js/tingle.js') }}" ></script>
+  <link href="{{ url_for('static', filename='css/tingle.css') }}" rel="stylesheet" type="text/css">
+
+  {% if hls|default(False) %}
+  <script src="{{ url_for('static', filename='js/hls.js') }}" ></script>
+  {% endif %}
+
+  {% block pagestyles %}{% endblock %}
+</head>
+
+<body class="container {{ template }}">
+  {% block content %}{% endblock %}
+</body>
+
+</html>

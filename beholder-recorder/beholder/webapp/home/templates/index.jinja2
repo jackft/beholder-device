@@ -1,0 +1,98 @@
+{% extends "layout.jinja2" %}
+
+{% block pagestyles %}
+{% endblock %}
+
+{% block content %}
+  {% include "navigation.jinja2" %}
+  <div style="max-width: 500px; margin: auto; margin-bottom: 20px;" class="alert alert-info" role="alert">
+    <h1>Camera Status</h1>
+    <ul>
+      <li><span style="margin-right:1.25em"><b>Running Status:</b></span><span id="running-state"></span></li>
+      <li><span style="margin-right:1.25em"><b>Running Reason:</b></span><span id="running-reason-state"></span></li>
+      <li>Storage: {{ hdd_used }} GB used of GB {{ hdd_total }} available</li>
+    </ul>
+  </div>
+  <div class="container" style="margin-bottom: 25px">
+    <div class="container" style="width: fit-content;">
+      <p>
+        <button id="test" type="button" class="btn btn-primary btn-lg">Test <span id="glass" style="display: none" class="glyphicon glyphicon-hourglass" aria-hidden="true"></span></button>
+      </p>
+    </div>
+    <div id="list" class="container" style="max-width: 75%"></div>
+  </div>
+  <script>
+    function setState(data) {
+      document.querySelector("#running-state").innerText = data["running_state"];
+      document.querySelector("#running-reason-state").innerText = data["running_reason"];
+    }
+
+    function createVideos(data) {
+      const list = document.querySelector("#list");
+      innerHTML = "";
+      data.videos.forEach(video => {
+        innerHTML += `
+        <div class="panel panel-default">
+          <div class="panel-heading">Video</div>
+          <div class="panel-body">
+            <video style="max-width: 100%" controls>
+              <source src="${video}">
+            </video>
+          </div>
+        </div>
+        `;
+      });
+      data.audios.forEach(audio => {
+        innerHTML += `
+        <div class="panel panel-default">
+          <div class="panel-heading">Audio</div>
+          <div class="panel-body">
+            <audio style="max-width: 100%" controls>
+              <source src="${audio}">
+            </audio>
+          </div>
+        </div>
+        `;
+      });
+      list.innerHTML = innerHTML;
+    }
+
+    function onTest() {
+      document.querySelector("#glass").style.display = "inline";
+      $.ajax({
+        type: "GET",
+        url: "/test",
+        success: (data) => {
+          document.querySelector("#glass").style.display = "none";
+          createVideos(data)
+        },
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+      });
+    }
+
+    $.ajax({
+      type: "GET",
+      url: "/state",
+      success: (data) => {
+        setState(data)
+      },
+      dataType: "json",
+      contentType: "application/json; charset=utf-8",
+    });
+
+    var intervalId = window.setInterval(function(){
+      $.ajax({
+        type: "GET",
+        url: "/state",
+        success: (data) => {
+          setState(data)
+        },
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+      });
+    }, 10000);
+
+    document.querySelector("#test").onclick = onTest;
+  </script>
+{% endblock %}
