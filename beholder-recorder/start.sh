@@ -7,5 +7,5 @@ export APP_CONFIG_FILE=config.py
 
 
 .venv/bin/flask init-db
-.venv/bin/flask users create 'jack.f.terwilliger@gmail.com' --password 'test' --active || echo "bingo"
+# .venv/bin/flask users create 'jack.f.terwilliger@gmail.com' --password 'test' --active || echo "bingo"
 .venv/bin/uwsgi --ini uwsgi.ini 2>&1

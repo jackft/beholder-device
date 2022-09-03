@@ -5,6 +5,7 @@ import datetime
 import subprocess
 import pathlib
 import pytz  # type: ignore
+import time
 
 from dateutil.parser import parse
 from urllib.parse import urlparse
@@ -17,8 +18,9 @@ from flask_login import current_user  # type: ignore
 
 from sqlalchemy import func  # type: ignore
 
-from beholder.webapp.models import BlackoutInterval, RecordTime, RTSPURI  # type: ignore
+from beholder.webapp.models import BlackoutInterval, RecordTime, RTSPURI, State  # type: ignore
 from beholder.webapp.db import db  # type: ignore
+from beholder.recorder.recorder import Recorder
 
 # Blueprint Configuration
 home_bp = Blueprint(
@@ -131,18 +133,13 @@ def settings():
     recordstart = recordtime.start.isoformat()
     recordend = recordtime.end.isoformat()
     recordactivated = recordtime.activated
-    hdd = psutil.disk_usage("/")
-    total = int(hdd.total / (2**30))
-    used = int(hdd.used / (2**30))
     return render_template(
         "settings.jinja2",
         title="stats and settings",
         user=current_user,
         recordstart=recordstart,
         recordend=recordend,
-        record_time_activated=recordactivated,
-        hdd_used=used,
-        hdd_total=total)
+        record_time_activated=recordactivated)
 
 # ------------------------------------------------------------------------------
 # Calendar
@@ -160,7 +157,7 @@ def calendar():
 
 
 # ------------------------------------------------------------------------------
-# Home
+# Cameras
 # ------------------------------------------------------------------------------
 
 @home_bp.route('/rtspuri/<int:id>', methods=['GET', 'PUT', 'DELETE'])
@@ -243,14 +240,97 @@ def rtspuris():
             ]
         )
 
-@home_bp.route('/', methods=['GET'])
+@home_bp.route('/cameras', methods=['GET'])
 @login_required
-def home():
-    """Home."""
+def cameras():
+    """cameras."""
     max_rtspid = db.session.query(func.max(RTSPURI.id)).scalar()
     return render_template(
-        "index.jinja2",
+        "cameras.jinja2",
         title="cameras",
         user=current_user,
         max_id=-1 if max_rtspid is None else max_rtspid
+    )
+
+# ------------------------------------------------------------------------------
+# Home
+# ------------------------------------------------------------------------------
+
+@home_bp.route('/state', methods=['GET'])
+@login_required
+def state():
+    running_state = db.session.query(State).filter(State.key == "running").first()
+    running_reason = db.session.query(State).filter(State.key == "running_reason").first()
+
+    gst_procs = len([p for p in psutil.process_iter() if 'gst-launch' in p.name().lower()])
+
+    if running_state is None:
+        running_state = "-"
+    elif running_state.value == "1" and gst_procs > 0:
+        running_state = "running"
+    else:
+        running_state = "not running"
+
+    if running_reason is None or gst_procs == 0:
+        running_reason = "-"
+    else:
+        print(running_reason.updated)
+        running_reason = running_reason.value
+
+    return jsonify({
+        "running_state": running_state,
+        "running_reason": running_reason,
+    })
+
+
+@home_bp.route('/test', methods=['GET'])
+@login_required
+def test():
+    recorder = Recorder.from_file(pathlib.Path(app.config["CONFIG"]))
+    recorder.out_path = "tmp/test"
+    path = pathlib.Path(recorder.out_path)
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
+    p = recorder.run()
+    time.sleep(15)
+    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
+    videos = []
+    for child in path.glob("*.mkv"):
+        video = path / child.name.replace(child.suffix, ".mp4")
+        subprocess.Popen([
+            "ffmpeg", "-y",
+            "-i", str(child),
+            "-c:v", "copy",
+            str(video)
+        ]).wait(timeout=5)
+        videos.append(video)
+    audios = []
+    for child in path.glob("*.mka"):
+        audio = path / child.name.replace(child.suffix, ".mp3")
+        subprocess.Popen([
+            "ffmpeg", "-y",
+            "-i", str(child),
+            str(audio)
+        ]).wait(timeout=5)
+        audios.append(audio)
+    return jsonify(
+        {
+            "videos": [f"/video/{video.name}" for video in videos],
+            "audios": [f"/video/{audio.name}" for audio in audios]
+        }
+    )
+
+@home_bp.route('/', methods=['GET'])
+@login_required
+def home():
+    """home."""
+    hdd = psutil.disk_usage("/")
+    total = int(hdd.total / (2**30))
+    used = int(hdd.used / (2**30))
+    return render_template(
+        "index.jinja2",
+        title="home",
+        user=current_user,
+        hdd_used=used,
+        hdd_total=total
     )

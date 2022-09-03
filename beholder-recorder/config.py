@@ -24,3 +24,5 @@ class Config:
     # Security
     SECURITY_PASSWORD_SALT = environ.get('SECRET_KEY')
     SECURITY_RECOVERABLE = False
+
+    CONFIG = "/home/beholder/beholder.ini"

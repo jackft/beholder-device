@@ -1,4 +1,5 @@
 from flask_security import UserMixin, RoleMixin
+from sqlalchemy.sql import func
 
 from .db import db
 
@@ -72,3 +73,10 @@ class RTSPURI(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     uri = db.Column(db.Text())
     name = db.Column(db.Text())
+
+class State(db.Model):  # type: ignore
+    __tablename__ = 'state'
+    __table_args__ = {}  # type: ignore
+    key = db.Column(db.Text(), primary_key=True)
+    value = db.Column(db.Text())
+    updated = db.Column(db.DateTime, onupdate=func.now())
