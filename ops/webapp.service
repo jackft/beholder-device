@@ -1,0 +1,18 @@
+[Unit]
+Description=Webapp for beholder
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+StartLimitIntervalSec=90
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=beholder
+WorkingDirectory=/home/beholder/beholder-device/beholder-recorder
+ExecStart=/home/beholder/beholder-device/beholder-recorder/start-webapp.sh
+
+[Install]
+WantedBy=multi-user.target

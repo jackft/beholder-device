@@ -1,0 +1,16 @@
+[Unit]
+Description=Beholder recorder
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=20
+User=beholder
+WorkingDirectory=/home/beholder/beholder-device/beholder-recorder
+ExecStart=/home/beholder/beholder-device/beholder-recorder/start-recorder.sh
+
+[Install]
+WantedBy=multi-user.target
+

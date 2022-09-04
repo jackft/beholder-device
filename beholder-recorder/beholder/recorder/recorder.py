@@ -221,9 +221,11 @@ class Uploader:
     def __init__(self,
                  s3handler: S3Handler,
                  out_path: pathlib.Path,
+                 log_path: pathlib.Path,
                  prefix: pathlib.Path):
         self.s3handler = s3handler
         self.out_path = out_path
+        self.log_path = out_path
         self.prefix = prefix
 
     @staticmethod
@@ -236,6 +238,7 @@ class Uploader:
         return Uploader(
             s3handler=S3Handler.from_file(config_path),
             out_path=pathlib.Path(parser.get("recorder", "out_path")),
+            log_path=pathlib.Path(parser.get("recorder", "log_path")),
             prefix=prefix
         )
 
@@ -256,12 +259,35 @@ class Uploader:
                     )
             except Exception:
                 _log().error("error handling %s", path, exc_info=True)
+        for path in self.log_path.glob("**/*"):
+            try:
+                if path.is_dir() and path != now_out_path:
+                    Uploader.handle_directory(path)
+                if path.suffix in Uploader.av_suffixes:
+                    cnt += Uploader.handle_log_file(
+                        self.prefix,
+                        self.s3handler,
+                        path
+                    )
+            except Exception:
+                _log().error("error handling %s", path, exc_info=True)
         return cnt
 
     @staticmethod
     def handle_directory(path: pathlib.Path):
         if len(os.listdir(path)) == 0:
             os.rmdir(path)
+
+    @staticmethod
+    def handle_log_file(prefix: pathlib.Path,
+                        s3handler: S3Handler,
+                        path: pathlib.Path):
+        if Uploader.is_currently_open(path, process): return 0
+
+        key = prefix / "logs" / path.name
+        s3handler.upload(path, str(key))
+        path.unlink()
+        return 1
 
     @staticmethod
     def handle_av_file(prefix: pathlib.Path,
@@ -528,7 +554,7 @@ class Controller:
         self.set_running_state(0)
         self.bad_consecutive_health_check_counter += 1
         if self.bad_consecutive_health_check_counter > self.bad_health_check_threshold:
-            subprocess.Popen(["reboot"])
+            subprocess.Popen(["sudo reboot"])
         else:
             Controller.super_kill_gstreamer().wait(timeout=5)
 
