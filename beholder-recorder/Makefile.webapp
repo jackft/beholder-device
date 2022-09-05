@@ -11,7 +11,7 @@ install: uwsgi_metrics
 uwsgi_metrics:
 	uwsgi_metrics
 
-clean: uwsgi_metrics
+clean: clean_uwsgi_metrics
 
-uwsgi_metrics:
+clean_uwsgi_metrics:
 	rm -rf uwsgi_metrics
