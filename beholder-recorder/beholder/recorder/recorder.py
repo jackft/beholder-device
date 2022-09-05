@@ -393,21 +393,17 @@ class Controller:
             _log().debug("running loop")
             self.interval_collection = self.refresh_interval_collection()
             self.record_times = self.refresh_record_times()
-            paused = self.read_paused_state()
             now = datetime.datetime.now()
             blackout = self.is_blackout_datetime(now)
             record_time = self.is_record_time(now)
             can_record = (
                 not blackout and
-                record_time and
-                not paused
+                record_time
             )
             if not can_record:
                 _log().debug("cannot record")
                 running_reasons = []
-                if paused:
-                    running_reasons.append("paused")
-                elif not record_time:
+                if not record_time:
                     running_reasons.append("not in daily record schedule")
                 elif blackout:
                     running_reasons.append("disallowed by calendar event")
@@ -435,22 +431,6 @@ class Controller:
 
             time.sleep(60)
 
-    def read_paused_state(self) -> bool:
-        """paused if less than 1 minute has elapsed since datetime"""
-        query ="SELECT updated, value FROM state WHERE key = 'paused'"
-        cursor = self.database_conn.cursor()
-        result = cursor.execute(query).fetchone()
-        if result is None:
-            cursor.execute("INSERT INTO state(key, value) VALUES ('paused', '0')")
-            self.database_conn.commit()
-            return self.read_paused_state()
-        paused = bool(int(result[1]))
-        if not paused: return False
-        paused_time = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
-        now = datetime.datetime.now()
-        difference = now - paused_time
-        return difference.total_seconds() < 60
-
     def set_running_state(self, value: int):
         query = """
         INSERT INTO state(key, value) VALUES('running', ?)
@@ -468,7 +448,6 @@ class Controller:
         cursor = self.database_conn.cursor()
         cursor.execute(query, (value,))
         self.database_conn.commit()
-
 
     @staticmethod
     def check_wifi() -> bool:
@@ -574,7 +553,7 @@ class Controller:
         if self.interval_collection is not None:
             is_blackout = self.interval_collection.point_overlaps(dt)
             _log().debug("record: %s", is_blackout)
-            return is_blackout
+            return bool(is_blackout)
         return False
 
     def is_record_time(self, dt: datetime.datetime) -> bool:
@@ -583,7 +562,7 @@ class Controller:
                 return True
             is_record = self.record_times.point_overlaps(dt.time())
             _log().debug("record: %s", is_record)
-            return is_record
+            return bool(is_record)
         return True
 
 
