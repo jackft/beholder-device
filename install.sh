@@ -14,6 +14,7 @@ grep -qxF "$RESTART_LINES" /etc/sudoers || echo "\n#auto-generated-by-beholder\n
 # create config directory
 echo "creating config directory"
 mkdir --mode=0755 -p /srv/beholder-config
+sudo chown -R beholder:beholder /srv/beholder-config
 
 # install services
 echo "installing recording & webapp service"

@@ -287,7 +287,7 @@ def state():
 @login_required
 def test():
     recorder = Recorder.from_file(pathlib.Path(app.config["CONFIG"]))
-    recorder.out_path = "tmp/test"
+    recorder.out_path = "/tmp/test"
     path = pathlib.Path(recorder.out_path)
     path.mkdir(parents=True, exist_ok=True)
 

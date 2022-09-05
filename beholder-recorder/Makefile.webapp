@@ -6,17 +6,12 @@ include ../common.mk
 
 build: install
 
-install: logs
+install: uwsgi_metrics
 
-logs:
-	mkdir -p logs
+uwsgi_metrics:
+	uwsgi_metrics
 
-clean: clean_data clean_logs
+clean: uwsgi_metrics
 
-clean_data:
-	rm -rf beholder-data
-
-clean_logs:
-	rm -rf logs
-
-clean_run: clean_data clean_logs
+uwsgi_metrics:
+	rm -rf uwsgi_metrics
