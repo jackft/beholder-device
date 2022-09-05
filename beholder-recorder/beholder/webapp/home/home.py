@@ -290,6 +290,10 @@ def test():
     recorder.out_path = "tmp/test"
     path = pathlib.Path(recorder.out_path)
     path.mkdir(parents=True, exist_ok=True)
+
+    for child in path.glob("*"):
+        child.unlink()
+
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
     p = recorder.run()
     time.sleep(15)

@@ -263,7 +263,7 @@ class Uploader:
             try:
                 if path.is_dir() and path != now_out_path:
                     Uploader.handle_directory(path)
-                if path.suffix in Uploader.av_suffixes:
+                if "log.txt" in path.name:
                     cnt += Uploader.handle_log_file(
                         self.prefix,
                         self.s3handler,
@@ -282,8 +282,6 @@ class Uploader:
     def handle_log_file(prefix: pathlib.Path,
                         s3handler: S3Handler,
                         path: pathlib.Path):
-        if Uploader.is_currently_open(path, process): return 0
-
         key = prefix / "logs" / path.name
         s3handler.upload(path, str(key))
         path.unlink()
