@@ -9,7 +9,7 @@ build: install
 install: uwsgi_metrics
 
 uwsgi_metrics:
-	uwsgi_metrics
+	mkdir -p uwsgi_metrics
 
 clean: clean_uwsgi_metrics
 
