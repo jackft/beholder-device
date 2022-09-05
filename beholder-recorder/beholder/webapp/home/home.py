@@ -7,7 +7,7 @@ import pathlib
 import pytz  # type: ignore
 import time
 
-from dateutil.parser import parse
+from dateutil.parser import parse  # type: ignore
 from urllib.parse import urlparse
 
 from flask import Blueprint, render_template, jsonify, request  # type: ignore
@@ -20,7 +20,7 @@ from sqlalchemy import func  # type: ignore
 
 from beholder.webapp.models import BlackoutInterval, RecordTime, RTSPURI, State  # type: ignore
 from beholder.webapp.db import db  # type: ignore
-from beholder.recorder.recorder import Recorder
+from beholder.recorder.recorder import Recorder  # type: ignore
 
 # Blueprint Configuration
 home_bp = Blueprint(
@@ -287,11 +287,15 @@ def state():
 @login_required
 def test():
     recorder = Recorder.from_file(pathlib.Path(app.config["CONFIG"]))
-    recorder.out_path = "tmp/test"
+    recorder.out_path = "/tmp/test"
     path = pathlib.Path(recorder.out_path)
     path.mkdir(parents=True, exist_ok=True)
+
+    for child in path.glob("*"):
+        child.unlink()
+
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
-    p = recorder.run()
+    recorder.run()
     time.sleep(15)
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
     videos = []

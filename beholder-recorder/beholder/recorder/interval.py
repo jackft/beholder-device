@@ -14,7 +14,7 @@ class Interval:
         else:
             self.end = end
 
-    def point_overlaps(self, date: Union[datetime, time]):
+    def point_overlaps(self, date: Union[datetime, time]) -> bool:
         if isinstance(date, time):
             return self.start.time() <= date and date <= self.end.time()
         else:
@@ -25,7 +25,7 @@ class IntervalCollection:
     def __init__(self, intervals: List[Interval]):
         self.intervals = intervals
 
-    def point_overlaps(self, date: datetime):
+    def point_overlaps(self, date: datetime) -> bool:
         return any(interval.point_overlaps(date) for interval in self.intervals)
 
     @staticmethod

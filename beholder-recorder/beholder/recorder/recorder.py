@@ -221,9 +221,11 @@ class Uploader:
     def __init__(self,
                  s3handler: S3Handler,
                  out_path: pathlib.Path,
+                 log_path: pathlib.Path,
                  prefix: pathlib.Path):
         self.s3handler = s3handler
         self.out_path = out_path
+        self.log_path = out_path
         self.prefix = prefix
 
     @staticmethod
@@ -236,6 +238,7 @@ class Uploader:
         return Uploader(
             s3handler=S3Handler.from_file(config_path),
             out_path=pathlib.Path(parser.get("recorder", "out_path")),
+            log_path=pathlib.Path(parser.get("recorder", "log_path")),
             prefix=prefix
         )
 
@@ -256,12 +259,33 @@ class Uploader:
                     )
             except Exception:
                 _log().error("error handling %s", path, exc_info=True)
+        for path in self.log_path.glob("**/*"):
+            try:
+                if path.is_dir() and path != now_out_path:
+                    Uploader.handle_directory(path)
+                if "log.txt" in path.name:
+                    cnt += Uploader.handle_log_file(
+                        self.prefix,
+                        self.s3handler,
+                        path
+                    )
+            except Exception:
+                _log().error("error handling %s", path, exc_info=True)
         return cnt
 
     @staticmethod
     def handle_directory(path: pathlib.Path):
         if len(os.listdir(path)) == 0:
             os.rmdir(path)
+
+    @staticmethod
+    def handle_log_file(prefix: pathlib.Path,
+                        s3handler: S3Handler,
+                        path: pathlib.Path):
+        key = prefix / "logs" / path.name
+        s3handler.upload(path, str(key))
+        path.unlink()
+        return 1
 
     @staticmethod
     def handle_av_file(prefix: pathlib.Path,
@@ -369,21 +393,17 @@ class Controller:
             _log().debug("running loop")
             self.interval_collection = self.refresh_interval_collection()
             self.record_times = self.refresh_record_times()
-            paused = self.read_paused_state()
             now = datetime.datetime.now()
             blackout = self.is_blackout_datetime(now)
             record_time = self.is_record_time(now)
             can_record = (
                 not blackout and
-                record_time and
-                not paused
+                record_time
             )
             if not can_record:
                 _log().debug("cannot record")
                 running_reasons = []
-                if paused:
-                    running_reasons.append("paused")
-                elif not record_time:
+                if not record_time:
                     running_reasons.append("not in daily record schedule")
                 elif blackout:
                     running_reasons.append("disallowed by calendar event")
@@ -411,22 +431,6 @@ class Controller:
 
             time.sleep(60)
 
-    def read_paused_state(self) -> bool:
-        """paused if less than 1 minute has elapsed since datetime"""
-        query ="SELECT updated, value FROM state WHERE key = 'paused'"
-        cursor = self.database_conn.cursor()
-        result = cursor.execute(query).fetchone()
-        if result is None:
-            cursor.execute("INSERT INTO state(key, value) VALUES ('paused', '0')")
-            self.database_conn.commit()
-            return self.read_paused_state()
-        paused = bool(int(result[1]))
-        if not paused: return False
-        paused_time = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
-        now = datetime.datetime.now()
-        difference = now - paused_time
-        return difference.total_seconds() < 60
-
     def set_running_state(self, value: int):
         query = """
         INSERT INTO state(key, value) VALUES('running', ?)
@@ -444,7 +448,6 @@ class Controller:
         cursor = self.database_conn.cursor()
         cursor.execute(query, (value,))
         self.database_conn.commit()
-
 
     @staticmethod
     def check_wifi() -> bool:
@@ -528,7 +531,7 @@ class Controller:
         self.set_running_state(0)
         self.bad_consecutive_health_check_counter += 1
         if self.bad_consecutive_health_check_counter > self.bad_health_check_threshold:
-            subprocess.Popen(["reboot"])
+            subprocess.Popen(["sudo reboot"])
         else:
             Controller.super_kill_gstreamer().wait(timeout=5)
 
@@ -550,7 +553,7 @@ class Controller:
         if self.interval_collection is not None:
             is_blackout = self.interval_collection.point_overlaps(dt)
             _log().debug("record: %s", is_blackout)
-            return is_blackout
+            return bool(is_blackout)
         return False
 
     def is_record_time(self, dt: datetime.datetime) -> bool:
@@ -559,7 +562,7 @@ class Controller:
                 return True
             is_record = self.record_times.point_overlaps(dt.time())
             _log().debug("record: %s", is_record)
-            return is_record
+            return bool(is_record)
         return True
 
 
