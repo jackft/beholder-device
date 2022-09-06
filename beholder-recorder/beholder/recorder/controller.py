@@ -366,7 +366,7 @@ class Controller:
                 time.sleep(5)
             if self.motion_detector_future.running(): return
         uri = self.get_main_rtsp_cam()
-        self.motion_detector_future = self.upload_pool.submit(lambda : self.motion_detect(uri))
+        self.motion_detector_future = self.upload_pool.submit(lambda: self.motion_detect(uri))
         self.motion_detector_future.add_done_callback(self.motion_detector_done)
 
     def motion_detect(self, uri):
