@@ -21,8 +21,6 @@
 *.pyo    binary
 
 *.mp4    binary
-*.js     binary
-*.css    binary
 
 # Jupyter notebook should be considered documentation
 *.ipynb linguist-vendored
@@ -31,3 +29,5 @@
 # with the python modules ``pickle``, ``dbm.*``,
 # ``shelve``, ``marshal``, ``anydbm``, & ``bsddb``
 # (among others).
+*.js linguist-detectable=false
+*.css linguist-detectable=false
