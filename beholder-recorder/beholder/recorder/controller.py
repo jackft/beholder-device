@@ -181,7 +181,7 @@ class Uploader:
         source = match.groups()[1]
         gst_start_s = gst_start.strftime('%Y-%m-%dT%H-%M-%S')
         start_s = start.strftime('%Y-%m-%dT%H-%M-%S')
-        return f"{start_s}.{gst_start_s}.{gst_group}.{source}{file.suffix}"
+        return f"{gst_start_s}.{start_s}.{gst_group}.{source}{file.suffix}"
 
     @staticmethod
     def file2key(out_path, file) -> pathlib.Path:
