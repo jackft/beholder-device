@@ -19,15 +19,17 @@
     let panels = [];
 
     class Panel {
-      constructor(parent, id, name, uri) {
+      constructor(parent, id, name, uri, main) {
         this.parent = parent
         this.id = id
         this.name = name
         this.uri = uri
+        this.main = main
 
         this.panel = null;
         this.uriInput = null;
         this.nameInput = null;
+        this.mainCheckbox = null;
         this.addButton = null;
         this.deleteButton = null;
         this.testButton = null;
@@ -46,6 +48,17 @@
         }
         this.nameInput.oninput = function() {
           _this.name = this.value;
+          _this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-remove");
+          _this.addedStatus.style.color = "black";
+        }
+        this.mainCheckbox.oninput = function() {
+          const checked = this.checked;
+          var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+          for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = false;
+          }
+          this.checked = checked;
+          _this.main = this.checked;
           _this.addedStatus.setAttribute("class", "glyphicon glyphicon-floppy-remove");
           _this.addedStatus.style.color = "black";
         }
@@ -131,6 +144,23 @@
         panelBody.appendChild(document.createElement("br"));
         this.nameInput = input2;
 
+        const inputGroup3 = document.createElement("div");
+        inputGroup3.setAttribute("class", "form-group");
+        panelBody.appendChild(inputGroup3);
+        this.mainCheckbox = document.createElement("input");
+        this.mainCheckbox.setAttribute("type", "checkbox");
+        this.mainCheckbox.setAttribute("id", `checkbox${panels.length+1}`);
+        if (this.main === null || !this.main) {
+          this.mainCheckbox.checked = false;
+        } else {
+          this.mainCheckbox.checked = true;
+        }
+        const checkLabel = document.createElement("label");
+        checkLabel.innerText = "main camera";
+        checkLabel.setAttribute("for", `checkbox${panels.length+1}`);
+        inputGroup3.appendChild(checkLabel);
+        inputGroup3.appendChild(this.mainCheckbox);
+
         const buttonContainer = document.createElement("p");
         panelBody.appendChild(buttonContainer);
 
@@ -147,7 +177,7 @@
         deleteButton.setAttribute("type", "button");
         deleteButton.setAttribute("class", "btn btn-danger btn-lg active");
         deleteButton.innerText ="Delete";
-        deleteButton.style.marginRight = "5px";
+        deleteButton.style.marginRight = "5px";name
         buttonContainer.appendChild(deleteButton);
         this.deleteButton = deleteButton;
 
@@ -188,6 +218,7 @@
               data: JSON.stringify({
                 uri: this.uri,
                 name: this.name,
+                main: this.main,
               }),
               success: (data) => {
                 this.id = data.id;
@@ -215,7 +246,8 @@
               data: JSON.stringify({
                 id: this.id,
                 uri: this.uri,
-                name: this.name
+                name: this.name,
+                main: this.main
               }),
               success: (data) => {
                 this.id = data.id;
@@ -251,6 +283,7 @@
             data: JSON.stringify({
               uri: this.uri,
               name: this.name,
+              main: this.main,
             }),
             success: (data) => {
               this.panel.remove();
@@ -275,7 +308,7 @@
           this.warning.innerText = "please enter a uri";
           return;
         }
- 
+
         this.validated.setAttribute("class", "glyphicon glyphicon-hourglass");
         this.validated.style.color = "black";
         this.validated.style.display = "inline";
@@ -284,8 +317,10 @@
           type: "POST",
           url: "/test_rtsp_uri",
           data: JSON.stringify({
+            id: this.id,
             uri: this.uri,
-            id: this.id
+            name: this.name,
+            main: this.main
           }),
           success: (data) => {
             this.img.src = `data:image/jpeg;base64,${data}`;
@@ -312,12 +347,12 @@
         const panel = new Panel(listDiv, null, null, null);
       }
       data.forEach(data => {
-        const panel = new Panel(listDiv, data.id, data.name, data.uri);
+        const panel = new Panel(listDiv, data.id, data.name, data.uri, data.main);
       });
     }
 
     function createPanel() {
-        const panel = new Panel(listDiv, null, null, null);
+        const panel = new Panel(listDiv, null, null, null, null);
     }
 
     $.ajax({
@@ -329,10 +364,6 @@
       dataType: "json",
       contentType: "application/json; charset=utf-8",
     });
-
-    function addNewCameraElement() {
-      
-    }
 
   </script>
 {% endblock %}

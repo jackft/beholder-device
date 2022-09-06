@@ -165,7 +165,7 @@ def calendar():
 def rtspuri(id):
     rtsp = RTSPURI.query.get(id)
     if request.method == 'GET':
-        return jsonify({"id": rtsp.id, "name": rtsp.name, "uri": rtsp.uri})
+        return jsonify({"id": rtsp.id, "name": rtsp.name, "uri": rtsp.uri, "main": rtsp.main})
     elif request.method == 'PUT':
         row = request.json
         app.logger.info("put %s", row)
@@ -175,8 +175,12 @@ def rtspuri(id):
         if hostname in hosts and hosts[hostname] != id:
             app.logger.info(hosts)
             return jsonify(success=False, error="duplicate host"), 400
+        if row["main"]:
+            for uri in uris:
+                uri.main = False
         rtsp.uri = row["uri"]
         rtsp.name = row["name"]
+        rtsp.main = row["main"]
         db.session.commit()
         return jsonify(sucsess=True), 200
     elif request.method == 'DELETE':
@@ -191,16 +195,16 @@ def test_rtsp_uri():
     row = request.json
     uri = row["uri"]
     id = row["id"]
-    p = pathlib.Path(f"/tmp/test_{id if id is not None else 'test'}.jpeg")
-    if p.exists():
-        p.unlink()
+    path = pathlib.Path(f"/tmp/test_{id if id is not None else 'test'}.jpeg")
+    if path.exists():
+        path.unlink()
     p = subprocess.Popen([
         "ffmpeg", "-y",
         "-i", uri,
-        "-vframes", "1", f"/tmp/test_{id}.jpeg"
+        "-vframes", "1", str(path)
     ])
     p.wait()
-    with open(f"/tmp/test_{id}.jpeg", "rb") as f:
+    with path.open("rb") as f:
         image_binary = f.read()
 
     response = make_response(base64.b64encode(image_binary))
@@ -220,9 +224,13 @@ def rtspuris():
         if urlparse(rtsp["uri"]).hostname in hosts:
             app.logger.info(hosts)
             return jsonify(success=False, error="duplicate host"), 400
+        if rtsp["main"]:
+            for uri in uris:
+                uri.main = False
         row = RTSPURI(
             uri=rtsp["uri"],
-            name=rtsp["name"]
+            name=rtsp["name"],
+            main=rtsp["main"]
         )
         db.session.add(row)
         db.session.commit()
@@ -234,7 +242,8 @@ def rtspuris():
                 {
                     "id": uri.id,
                     "uri": uri.uri,
-                    "name": uri.name
+                    "name": uri.name,
+                    "main": uri.main
                 }
                 for uri in uris
             ]
@@ -295,7 +304,7 @@ def test():
         child.unlink()
 
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
-    recorder.run()
+    recorder.run(detection=False)
     time.sleep(15)
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
     videos = []

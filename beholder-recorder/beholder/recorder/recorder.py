@@ -19,6 +19,8 @@ import psutil  # type: ignore
 import pulsectl  # type: ignore
 import requests  # type: ignore
 
+from .computer_vision import MotionDetector
+from .computer_vision import KILL_FILE as MOTION_DETECTOR_KILL_FILE
 from .interval import RecordTime, IntervalCollection
 from .utils import pathify, _log
 
@@ -225,7 +227,7 @@ class Uploader:
                  prefix: pathlib.Path):
         self.s3handler = s3handler
         self.out_path = out_path
-        self.log_path = out_path
+        self.log_path = log_path
         self.prefix = prefix
 
     @staticmethod
@@ -344,11 +346,13 @@ class Controller:
     def __init__(self,
                  recorder: Recorder,
                  uploader: Uploader,
+                 motion_detector: MotionDetector,
                  database_path: str,
                  available_space_threshold: int = 500000,
                  bad_health_check_threshold: int = 10):
         self.recorder = recorder
         self.uploader = uploader
+        self.motion_detector = motion_detector
 
         self.available_space_threshold = available_space_threshold
 
@@ -360,7 +364,7 @@ class Controller:
         self.recorder_process: Optional[subprocess.Popen] = None
         self.recorder_health_checker: Optional[RecordProcessHealthChecker] = None
         self.bad_consecutive_health_check_counter = 0
-        self.bad_health_check_threshold = 0
+        self.bad_health_check_threshold = bad_health_check_threshold
 
         self.interval_collection: Optional[IntervalCollection] = self.refresh_interval_collection()
         self.record_times: Optional[RecordTime] = self.refresh_record_times()
@@ -369,6 +373,8 @@ class Controller:
         multiprocessing_logging.install_mp_handler()
         self.upload_pool = Pool(max_workers=1)
         self.upload_future: Optional[Future] = None
+        self.motion_detector_pool = Pool(max_workers=1)
+        self.motion_detector_future: Optional[Future] = None
 
         self.uris = self.get_uris()[1]
 
@@ -381,6 +387,7 @@ class Controller:
         return Controller(
             recorder=Recorder.from_file(config_path),
             uploader=Uploader.from_file(config_path),
+            motion_detector=MotionDetector.from_file(config_path),
             database_path=parser.get("device", "database"),
             available_space_threshold=parser.getint(
                 "device", "available_space_threshold", fallback=500000),
@@ -388,7 +395,7 @@ class Controller:
                 "recorder", "bad_health_check_threshold", fallback=10)
         )
 
-    def run(self):
+    def run(self, detection=True):
         while True:
             _log().debug("running loop")
             self.interval_collection = self.refresh_interval_collection()
@@ -423,6 +430,8 @@ class Controller:
                     self.record()
                     self.set_running_state(1)
                     self.set_running_reason("running")
+                    if detection:
+                        self.start_motion_detector()
                 elif can_record:
                     self.handle_recorder_health()
 
@@ -465,18 +474,20 @@ class Controller:
         return available_bytes
 
     def get_uris(self):
-        ids = []
-        uris = []
-        names = []
+        ids: List[int] = []
+        uris: List[str] = []
+        names: List[str] = []
+        mains: List[int] = []
         cursor = self.database_conn.cursor()
-        for id, uri, name in cursor.execute("SELECT id, uri, name FROM rtspuri;"):
+        for id, uri, name, main in cursor.execute("SELECT id, uri, name, main FROM rtspuri;"):
             ids.append(id)
             uris.append(uri)
             names.append(name)
-        return ids, uris, names
+            mains.append(main)
+        return ids, uris, names, mains
 
     def uris_changed(self):
-        _, new_uris, _ = self.get_uris()
+        _, new_uris, _, _ = self.get_uris()
         old_uris = self.uris
         _log().debug("old uris: %s", "".join(x for x in sorted(old_uris)))
         _log().debug("new uris: %s", "".join(x for x in sorted(new_uris)))
@@ -485,6 +496,39 @@ class Controller:
             !=
             "".join(x[1] for x in sorted(old_uris, key=lambda x: x[1]))
         )
+
+    def get_main_rtsp_cam(self) -> Optional[str]:
+        _, uris, _, mains = self.get_uris()
+        if len(uris) == 0: return None
+        rtsp = zip(uris, mains)
+        maybe_uri: List[str] = [uri for uri, main in rtsp if main == 1]
+        if len(maybe_uri) == 0:
+            return uris[0]  # type: ignore
+        return maybe_uri[0]
+
+    def start_motion_detector(self):
+        if self.motion_detector_future is not None:
+            self.motion_detector_future.cancel()
+            if self.motion_detector_future.running():
+                MOTION_DETECTOR_KILL_FILE.touch(exist_ok=True)
+                time.sleep(5)
+            if self.motion_detector_future.running(): return
+        self.motion_detector_future = self.upload_pool.submit(self.motion_detect)
+        self.motion_detector_future.add_done_callback(self.motion_detector_done)
+
+    def motion_detect(self):
+        _log().debug("starting motion_detector")
+        uri = self.get_main_rtsp_cam()
+        if uri is None:
+            _log().info("failed to start motion_detector. No main camera")
+            return
+        return self.motion_detector.run(uri)
+
+    def motion_detector_done(self, future):
+        if future.exception() is not None:
+            _log().error("uncaught processing exception %s", future.exception(), exc_info=True)
+        else:
+            _log().info("motion detector stopped unexpectedly")
 
     def start_upload(self):
         self.upload_future = self.upload_pool.submit(self.upload)

@@ -6,7 +6,14 @@ include ../common.mk
 
 build: install
 
-install: uwsgi_metrics
+install: uwsgi_metrics initialize
+
+initialize:
+	$(VIRTUALENV)/bin/flask init-db
+	$(VIRTUALENV)/bin/flask users create \
+		$(shell awk -F "=" '/username/ {print $$2}' /home/${USER}/Desktop/beholder.ini) \
+		--password $(shell awk -F "=" '/password/ {print $$2}' /home/${USER}/Desktop/beholder.ini) \
+		--active || echo "already exists"
 
 uwsgi_metrics:
 	mkdir -p uwsgi_metrics

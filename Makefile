@@ -1,12 +1,12 @@
 .DEFAULT_GOAL := build
 .PHONY: build
 
-build: configure build_recorder build_webapp
+build: configure build_webapp build_recorder
 
 
-OUT_PATH=$(shell awk -F '=' '/^out_path/ {print $$2}' /home/beholder/Desktop/beholder.ini)
+OUT_PATH=$(shell awk -F '=' '/^out_path/ {print $$2}' /home/${USER}/Desktop/beholder.ini)
 
-DB=$(shell awk -F '=' '/^database/ {print $$2}' /home/beholder/Desktop/beholder.ini)
+DB=$(shell awk -F '=' '/^database/ {print $$2}' /home/${USER}/Desktop/beholder.ini)
 KEY=$(shell openssl rand -base64 12)
 HASH=$(shell openssl rand -base64 12)
 SALT=$(shell openssl rand -base64 12)
