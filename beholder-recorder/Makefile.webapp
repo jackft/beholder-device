@@ -9,7 +9,6 @@ build: install
 install: uwsgi_metrics initialize
 
 initialize:
-	database=$(awk -F "=" '/database/ {print $$2}' /home/beholder/Desktop/beholder.ini)
 	username=$(awk -F "=" '/username/ {print $$2}' /home/beholder/Desktop/beholder.ini)
 	password=$(awk -F "=" '/password/ {print $$2}' /home/beholder/Desktop/beholder.ini)
 	$(VIRTUALENV)/bin/flask users create $email --password $password --active
