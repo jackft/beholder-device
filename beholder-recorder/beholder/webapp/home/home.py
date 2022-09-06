@@ -197,10 +197,10 @@ def test_rtsp_uri():
     p = subprocess.Popen([
         "ffmpeg", "-y",
         "-i", uri,
-        "-vframes", "1", f"/tmp/test_{id}.jpeg"
+        "-vframes", "1", str(p)
     ])
     p.wait()
-    with open(f"/tmp/test_{id}.jpeg", "rb") as f:
+    with p.open("rb") as f:
         image_binary = f.read()
 
     response = make_response(base64.b64encode(image_binary))
