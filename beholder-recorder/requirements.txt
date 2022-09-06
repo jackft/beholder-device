@@ -30,6 +30,7 @@ mccabe==0.7.0
 multiprocessing-logging==0.3.3
 mypy==0.971
 mypy-extensions==0.4.3
+opencv-python==4.6.0.66
 passlib==1.7.4
 psutil==5.9.1
 pulsectl==22.3.2

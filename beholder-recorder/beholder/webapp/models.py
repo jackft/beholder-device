@@ -73,6 +73,7 @@ class RTSPURI(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     uri = db.Column(db.Text())
     name = db.Column(db.Text())
+    main = db.Column(db.Integer())
 
 class State(db.Model):  # type: ignore
     __tablename__ = 'state'
