@@ -4,7 +4,7 @@ import pathlib
 import click
 from click_loglevel import LogLevel  # type: ignore
 
-from .recorder import Controller
+from .controller import Controller
 from .utils import setup_logging
 
 
