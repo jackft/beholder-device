@@ -95,7 +95,7 @@ class Recorder:
         pulse_src = Recorder._get_pulse_source()
         if pulse_src is not None:
             # set volume high
-            subprocess.Popen(["pacmd", "set-source-volume", str(pulse_src), "0x30000"])
+            subprocess.Popen(["pacmd", "set-source-volume", str(pulse_src), "0x10000"])
             script += (
                 self._record_audio_in(
                     pulse_src,
