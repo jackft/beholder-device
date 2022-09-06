@@ -282,8 +282,6 @@ class Controller:
                     self.record()
                     self.set_running_state(1)
                     self.set_running_reason("running")
-                    if detection:
-                        self.start_motion_detector()
                 elif can_record:
                     self.handle_recorder_health()
 
