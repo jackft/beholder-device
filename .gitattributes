@@ -31,3 +31,4 @@
 # (among others).
 *.js linguist-detectable=false
 *.css linguist-detectable=false
+*.jinja2 linguist-detectable=false
