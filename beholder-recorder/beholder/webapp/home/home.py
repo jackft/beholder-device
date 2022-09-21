@@ -304,7 +304,7 @@ def test():
         child.unlink()
 
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
-    recorder.run(detection=False)
+    recorder.run()
     time.sleep(15)
     subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
     videos = []
