@@ -7,7 +7,7 @@ import logging.handlers
 import threading
 import time
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import cv2  # type: ignore
 import numpy as np  # type: ignore
@@ -16,7 +16,7 @@ import numpy as np  # type: ignore
 class VideoCapture:
 
     def __init__(self, name):
-        self.cap = cv2.VideoCapture(name)
+        self.cap = cv2.VideoCapture(name, cv2.CAP_FFMPEG)
         self.q = queue.Queue()
         t = threading.Thread(target=self._reader)
         t.daemon = True
@@ -112,7 +112,10 @@ class MotionDetector:
             if areas[idx] > 3
         ]
 
-    def run(self, rtsp_uri: str, test=False):
+    def run(self, rtsp_uri: str, test=False, sleep: Optional[float] = None):
+        KILL_FILE.unlink(missing_ok=True)
+        if sleep is not None:
+            time.sleep(sleep)
         cap = VideoCapture(rtsp_uri)
         while True:
             if KILL_FILE.exists():
@@ -138,8 +141,7 @@ class MotionDetector:
                 )
             time.sleep(1 / 5)
         cap.release()
-        if KILL_FILE.exists():
-            KILL_FILE.unlink()
+        KILL_FILE.unlink(missing_ok=True)
 
 
 def drawbbox(frame, x, y, w, h):

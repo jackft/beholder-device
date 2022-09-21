@@ -21,7 +21,7 @@ import requests  # type: ignore
 from .computer_vision import MotionDetector
 from .computer_vision import KILL_FILE as MOTION_DETECTOR_KILL_FILE
 from .interval import RecordTime, IntervalCollection
-from .recorder import Recorder
+from .recorder import check_rtsp_health, Recorder
 from .utils import pathify, _log
 
 class S3Handler():
@@ -199,12 +199,14 @@ class Controller:
                  recorder: Recorder,
                  uploader: Uploader,
                  motion_detector: MotionDetector,
+                 motion_detector_on: bool,
                  database_path: str,
                  available_space_threshold: int = 500000,
                  bad_health_check_threshold: int = 10):
         self.recorder = recorder
         self.uploader = uploader
         self.motion_detector = motion_detector
+        self.motion_detector_on = motion_detector_on
 
         self.available_space_threshold = available_space_threshold
 
@@ -215,6 +217,7 @@ class Controller:
 
         self.recorder_process: Optional[subprocess.Popen] = None
         self.recorder_health_checker: Optional[RecordProcessHealthChecker] = None
+        self.device_checker: Optional[DeviceChecker] = None
         self.bad_consecutive_health_check_counter = 0
         self.bad_health_check_threshold = bad_health_check_threshold
 
@@ -240,14 +243,15 @@ class Controller:
             recorder=Recorder.from_file(config_path),
             uploader=Uploader.from_file(config_path),
             motion_detector=MotionDetector.from_file(config_path),
+            motion_detector_on=parser.getboolean("recorder", "motion_detector_on", fallback=False),
             database_path=parser.get("device", "database"),
             available_space_threshold=parser.getint(
                 "device", "available_space_threshold", fallback=500000),
-            bad_health_check_threshold=parser.get(
-                "recorder", "bad_health_check_threshold", fallback=10)
+            bad_health_check_threshold=parser.getint(
+                "recorder", "bad_health_check_threshold", fallback=2)
         )
 
-    def run(self, detection=True):
+    def run(self):
         while True:
             _log().debug("running loop")
             self.interval_collection = self.refresh_interval_collection()
@@ -257,7 +261,8 @@ class Controller:
             record_time = self.is_record_time(now)
             can_record = (
                 not blackout and
-                record_time
+                record_time and
+                not self.get_paused_status()
             )
             if not can_record:
                 _log().debug("cannot record")
@@ -276,19 +281,22 @@ class Controller:
                     can_record and (
                         self.recorder_process is None or
                         self.recorder_process.poll() is not None or
-                        self.uris_changed()
+                        self.uris_changed() and
+                        not self.get_paused_status()
                     )
                 ):
                     self.record()
                     self.set_running_state(1)
                     self.set_running_reason("running")
+                    if self.motion_detector_on:
+                        self.start_motion_detector()
                 elif can_record:
                     self.handle_recorder_health()
 
             if Controller.check_wifi():
                 self.start_upload()
 
-            time.sleep(60)
+            time.sleep(10)
 
     def set_running_state(self, value: int):
         query = """
@@ -307,6 +315,18 @@ class Controller:
         cursor = self.database_conn.cursor()
         cursor.execute(query, (value,))
         self.database_conn.commit()
+
+    def get_paused_status(self) -> bool:
+        query = "SELECT value FROM state WHERE key = 'paused'"
+        cursor = self.database_conn.cursor()
+        cursor.execute(query)
+        value = cursor.fetchone()
+        if value is None:
+            return False
+        try:
+            return bool(int(value[0]))
+        except Exception:
+            return False
 
     @staticmethod
     def check_wifi() -> bool:
@@ -364,15 +384,15 @@ class Controller:
                 time.sleep(5)
             if self.motion_detector_future.running(): return
         uri = self.get_main_rtsp_cam()
-        self.motion_detector_future = self.upload_pool.submit(lambda: self.motion_detect(uri))
+        self.motion_detector_future = self.upload_pool.submit(lambda: self.motion_detect(uri, 15.))
         self.motion_detector_future.add_done_callback(self.motion_detector_done)
 
-    def motion_detect(self, uri):
+    def motion_detect(self, uri, sleep: Optional[float] = None):
         _log().debug("starting motion_detector")
         if uri is None:
             _log().info("failed to start motion_detector. No main camera")
             return
-        return self.motion_detector.run(uri)
+        return self.motion_detector.run(uri, sleep=sleep)
 
     def motion_detector_done(self, future):
         if future.exception() is not None:
@@ -406,6 +426,10 @@ class Controller:
         self.recorder_process = self.recorder.run(now=True)
 
     @staticmethod
+    def kill_motion_detector():
+        MOTION_DETECTOR_KILL_FILE.touch(exist_ok=True)
+
+    @staticmethod
     def kill_gstreamer():
         return subprocess.Popen(["killall", "gst-launch-1.0"])
 
@@ -416,7 +440,10 @@ class Controller:
     def handle_recorder_health(self):
         if self.recorder_health_checker is None:
             self.recorder_health_checker = RecordProcessHealthChecker(self.recorder_process)
-        is_healthy = self.recorder_health_checker.check()
+        if self.device_checker is None:
+            self.device_checker = DeviceChecker(self.database_conn)
+
+        is_healthy = self.recorder_health_checker.check() and self.device_checker.check()
         if is_healthy:
             self.bad_consecutive_health_check_counter = 0
             return
@@ -428,6 +455,7 @@ class Controller:
             subprocess.Popen(["sudo reboot"])
         else:
             Controller.super_kill_gstreamer().wait(timeout=5)
+            Controller.kill_motion_detector()
 
     # handle record times
 
@@ -458,6 +486,43 @@ class Controller:
             _log().debug("record: %s", is_record)
             return bool(is_record)
         return True
+
+
+class DeviceChecker:
+    def __init__(self, database_conn):
+        self.database_conn = database_conn
+        self.devices: Optional[Dict[str, bool]] = None
+
+    def check(self) -> bool:
+        if self.devices is None:
+            self.devices = self.refresh_devices()
+            return True
+
+        devices = self.refresh_devices()
+        print(devices, self.devices)
+        health = True
+        for device, _health in devices.items():
+            if device not in self.devices or not _health:
+                health = False
+        for device, _ in self.devices.items():
+            if device not in devices:
+                health = False
+        self.devices = devices
+        if not health:
+            _log().warn("devices changed")
+        return health
+
+
+    def refresh_devices(self):
+        devices = {}
+        pulse_src = Recorder._get_pulse_source()
+        if pulse_src is not None:
+            devices[pulse_src] = True
+        cursor = self.database_conn.cursor()
+        for _, uri, _ in cursor.execute("SELECT id, uri, name FROM rtspuri;"):
+            health = check_rtsp_health(uri)
+            devices[uri] = health
+        return devices
 
 
 class RecordProcessHealthChecker:
