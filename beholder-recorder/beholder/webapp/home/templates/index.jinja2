@@ -17,6 +17,7 @@
     <div class="container" style="width: fit-content;">
       <p>
         <button id="test" type="button" class="btn btn-primary btn-lg">Test <span id="glass" style="display: none" class="glyphicon glyphicon-hourglass" aria-hidden="true"></span></button>
+        <button id="paused" type="button" class="btn btn- btn-lg" alt="toggle recording">enable/disable recording <span id="record-icon" style="display: inline" class="glyphicon glyphicon-record" aria-hidden="true"></span></button>
       </p>
     </div>
     <div id="list" class="container" style="max-width: 75%"></div>
@@ -71,6 +72,38 @@
       });
     }
 
+    function onPause() {
+      $.ajax({
+        type: "PUT",
+        url: "/pause",
+        success: (data) => {
+          if (data.paused) {
+            document.querySelector("#record-icon").style.color = "grey";
+          } else {
+            document.querySelector("#record-icon").style.color = "red";
+          }
+        },
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+      });
+    }
+
+    function getPause() {
+      $.ajax({
+        type: "GET",
+        url: "/pause",
+        success: (data) => {
+          if (data.paused) {
+            document.querySelector("#record-icon").style.color = "grey";
+          } else {
+            document.querySelector("#record-icon").style.color = "red";
+          }
+        },
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+      });
+    }
+
     $.ajax({
       type: "GET",
       url: "/state",
@@ -94,5 +127,8 @@
     }, 10000);
 
     document.querySelector("#test").onclick = onTest;
+    document.querySelector("#paused").onclick = onPause;
+
+    getPause();
   </script>
 {% endblock %}

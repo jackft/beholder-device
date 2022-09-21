@@ -268,23 +268,26 @@ def cameras():
 @home_bp.route('/state', methods=['GET'])
 @login_required
 def state():
+    paused = db.session.query(State).filter(State.key == "paused").first()
     running_state = db.session.query(State).filter(State.key == "running").first()
     running_reason = db.session.query(State).filter(State.key == "running_reason").first()
 
     gst_procs = len([p for p in psutil.process_iter() if 'gst-launch' in p.name().lower()])
-
-    if running_state is None:
-        running_state = "-"
-    elif running_state.value == "1" and gst_procs > 0:
-        running_state = "running"
-    else:
+    if paused is not None and paused.value == "1":
         running_state = "not running"
-
-    if running_reason is None or gst_procs == 0:
-        running_reason = "-"
+        running_reason = "you've disabled recording"
     else:
-        print(running_reason.updated)
-        running_reason = running_reason.value
+        if running_state is None:
+            running_state = "-"
+        elif running_state.value == "1" and gst_procs > 0:
+            running_state = "running"
+        else:
+            running_state = "not running"
+
+        if running_reason is None or gst_procs == 0:
+            running_reason = "-"
+        else:
+            running_reason = running_reason.value
 
     return jsonify({
         "running_state": running_state,
@@ -332,6 +335,35 @@ def test():
             "audios": [f"/video/{audio.name}" for audio in audios]
         }
     )
+
+
+@home_bp.route('/pause', methods=['GET', 'PUT'])
+def toggle_pause():
+    def _create_new_paused():
+        paused_state = State(key="paused", value="0")
+        db.session.add(paused_state)
+        db.session.commit()
+        return {"paused": False}
+
+    if request.method == 'GET':
+        paused = db.session.query(State).filter(State.key == "paused").first()
+        if paused is None:
+            return jsonify(_create_new_paused())
+        elif paused.value == "0":
+            return jsonify({"paused": False})
+        return jsonify({"paused": True})
+    paused = db.session.query(State).filter(State.key == "paused").first()
+    print(paused)
+    if paused is None:
+        return jsonify(_create_new_paused())
+    elif paused.value == "0":
+        paused.value = "1"
+        db.session.commit()
+        return jsonify({"paused": True})
+    paused.value = "0"
+    db.session.commit()
+    return jsonify({"paused": False})
+
 
 @home_bp.route('/', methods=['GET'])
 @login_required

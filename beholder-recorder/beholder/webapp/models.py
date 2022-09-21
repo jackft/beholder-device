@@ -1,7 +1,7 @@
 from flask_security import UserMixin, RoleMixin  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 
-from .db import db
+from beholder.webapp.db import db
 
 class RolesUsers(db.Model):  # type: ignore
     __tablename__ = 'roles_users'
