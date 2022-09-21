@@ -512,7 +512,6 @@ class DeviceChecker:
             _log().warn("devices changed")
         return health
 
-
     def refresh_devices(self):
         devices = {}
         pulse_src = Recorder._get_pulse_source()
