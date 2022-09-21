@@ -306,10 +306,10 @@ def test():
     for child in path.glob("*"):
         child.unlink()
 
-    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
+    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(5)
     recorder.run()
     time.sleep(15)
-    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(2)
+    subprocess.Popen(["killall", "gst-launch-1.0"]).wait(2)
     videos = []
     for child in path.glob("*.mkv"):
         video = path / child.name.replace(child.suffix, ".mp4")
