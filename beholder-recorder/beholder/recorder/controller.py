@@ -296,7 +296,7 @@ class Controller:
             if Controller.check_wifi():
                 self.start_upload()
 
-            time.sleep(10)
+            time.sleep(90)
 
     def set_running_state(self, value: int):
         query = """
