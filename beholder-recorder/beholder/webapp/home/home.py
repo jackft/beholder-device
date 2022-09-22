@@ -309,7 +309,9 @@ def test():
     original_paused_value = paused.value
     paused.value = "1"
     db.session.commit()
-    time.sleep(5)
+    time.sleep(2)
+    subprocess.Popen(["sudo", "systemctl", "restart", "recorder"]).wait(2)
+    time.sleep(2)
     recorder.run()
     time.sleep(15)
     subprocess.Popen(["killall", "gst-launch-1.0"]).wait(2)
