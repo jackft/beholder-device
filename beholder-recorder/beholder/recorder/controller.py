@@ -497,7 +497,7 @@ class Controller:
         self.set_running_state(0)
         self.bad_consecutive_health_check_counter += 1
         if self.bad_consecutive_health_check_counter > self.bad_health_check_threshold:
-            subprocess.Popen(["sudo reboot"])
+            subprocess.Popen(["sudo", "reboot"])
         else:
             Controller.super_kill_gstreamer().wait(timeout=5)
             Controller.kill_motion_detector()
