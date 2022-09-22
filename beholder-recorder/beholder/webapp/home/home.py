@@ -305,8 +305,11 @@ def test():
 
     for child in path.glob("*"):
         child.unlink()
-
-    subprocess.Popen(["killall", "-9", "gst-launch-1.0"]).wait(5)
+    paused = db.session.query(State).filter(State.key == "paused").first()
+    original_paused_value = paused.value
+    paused.value = "1"
+    db.session.commit()
+    time.sleep(5)
     recorder.run()
     time.sleep(15)
     subprocess.Popen(["killall", "gst-launch-1.0"]).wait(2)
@@ -329,6 +332,8 @@ def test():
             str(audio)
         ]).wait(timeout=5)
         audios.append(audio)
+    paused.value = original_paused_value
+    db.session.commit()
     return jsonify(
         {
             "videos": [f"/video/{video.name}" for video in videos],
@@ -353,7 +358,6 @@ def toggle_pause():
             return jsonify({"paused": False})
         return jsonify({"paused": True})
     paused = db.session.query(State).filter(State.key == "paused").first()
-    print(paused)
     if paused is None:
         return jsonify(_create_new_paused())
     elif paused.value == "0":
