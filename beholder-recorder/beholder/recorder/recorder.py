@@ -60,8 +60,7 @@ class Recorder:
         with pulsectl.Pulse('event-printer') as pulse:
             sources = sorted(
                 pulse.source_list(),
-                key=lambda src: src.channel_count,  # type: ignore
-                reverse=True
+                key=lambda src: src.channel_count  # type: ignore
             ) # type: ignore
         for source in sources:
             if 'usb' in source.name.lower():

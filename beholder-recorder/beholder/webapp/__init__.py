@@ -8,15 +8,23 @@ def create_app():
     app.config.from_object('config.Config')
 
     with app.app_context():
-        from .db import db
-        from .db import init_app as db_init_app
+        from .db import init_app as db_init_app, db
         db_init_app(app)
-        from .models import User, Role
+        from .models import User, Role, State
         user_datastore = SQLAlchemySessionUserDatastore(db.session, User, Role)
         Security(app, user_datastore)
 
         # Import parts of our application
         from .home import home  # type: ignore
         app.register_blueprint(home.home_bp)
+
+        # always clear paused reason
+        paused = db.session.query(State).filter(State.key == "paused").first()
+        if paused is None:
+            paused_state = State(key="paused", value="0")
+            db.session.add(paused_state)
+        else:
+            paused.value = "0"
+        db.session.commit()
 
         return app

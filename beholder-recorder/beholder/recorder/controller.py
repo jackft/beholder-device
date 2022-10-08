@@ -21,7 +21,7 @@ import requests  # type: ignore
 from .computer_vision import MotionDetector
 from .computer_vision import KILL_FILE as MOTION_DETECTOR_KILL_FILE
 from .interval import RecordTime, IntervalCollection
-from .recorder import Recorder
+from .recorder import check_rtsp_health, Recorder
 from .utils import pathify, _log
 
 class S3Handler():
@@ -76,10 +76,12 @@ class Uploader:
                  s3handler: S3Handler,
                  out_path: pathlib.Path,
                  log_path: pathlib.Path,
+                 detect_path: pathlib.Path,
                  prefix: pathlib.Path):
         self.s3handler = s3handler
         self.out_path = out_path
         self.log_path = log_path
+        self.detect_path = detect_path
         self.prefix = prefix
 
     @staticmethod
@@ -92,40 +94,62 @@ class Uploader:
         return Uploader(
             s3handler=S3Handler.from_file(config_path),
             out_path=pathlib.Path(parser.get("recorder", "out_path")),
-            log_path=pathlib.Path(parser.get("recorder", "log_path")),
+            log_path=pathlib.Path(parser.get("recorder", "log_path")).parent,
+            detect_path=pathlib.Path(parser.get("recorder", "motion_detector_out_path")).parent,
             prefix=prefix
         )
 
     def run(self,
             process: Optional[subprocess.Popen] = None,
             now_out_path: Optional[pathlib.Path] = None):
-        cnt = 0
-        for path in self.out_path.glob("**/*"):
-            try:
-                if path.is_dir() and path != now_out_path:
-                    Uploader.handle_directory(path)
-                if path.suffix in Uploader.av_suffixes:
-                    cnt += Uploader.handle_av_file(
-                        self.prefix,
-                        self.s3handler,
-                        path,
-                        process=process
-                    )
-            except Exception:
-                _log().error("error handling %s", path, exc_info=True)
-        for path in self.log_path.glob("**/*"):
-            try:
-                if path.is_dir() and path != now_out_path:
-                    Uploader.handle_directory(path)
-                if "log.txt" in path.name:
-                    cnt += Uploader.handle_log_file(
-                        self.prefix,
-                        self.s3handler,
-                        path
-                    )
-            except Exception:
-                _log().error("error handling %s", path, exc_info=True)
-        return cnt
+        while True:
+            vcnt = 0
+            for path in self.out_path.glob("**/*"):
+                try:
+                    _log().debug("uploading %s", path)
+                    if path.is_dir() and path != now_out_path:
+                        Uploader.handle_directory(path)
+                    if path.suffix in Uploader.av_suffixes:
+                        vcnt += Uploader.handle_av_file(
+                            self.prefix,
+                            self.s3handler,
+                            path,
+                            process=process
+                        )
+                except Exception:
+                    _log().error("error handling %s", path, exc_info=True)
+            lcnt = 0
+            for path in self.log_path.glob("**/*"):
+                try:
+                    _log().debug("uploading %s", path)
+                    if path.name == "log.txt": continue
+                    if path.is_dir() and path != now_out_path:
+                        Uploader.handle_directory(path)
+                    if "log.txt" in path.name:
+                        lcnt += Uploader.handle_log_file(
+                            self.prefix,
+                            self.s3handler,
+                            path
+                        )
+                except Exception:
+                    _log().error("error handling %s", path, exc_info=True)
+            dcnt = 0
+            for path in self.detect_path.glob("**/*"):
+                try:
+                    _log().debug("uploading %s", path)
+                    if path.name == "detection.txt": continue
+                    if path.is_dir() and path != now_out_path:
+                        Uploader.handle_directory(path)
+                    if "detection.txt" in path.name:
+                        dcnt += Uploader.handle_detect_file(
+                            self.prefix,
+                            self.s3handler,
+                            path
+                        )
+                except Exception:
+                    _log().error("error handling %s", path, exc_info=True)
+            _log().debug("uploaded %d videos %s logs %d detections", vcnt, lcnt, dcnt)
+            time.sleep(60)
 
     @staticmethod
     def handle_directory(path: pathlib.Path):
@@ -142,11 +166,20 @@ class Uploader:
         return 1
 
     @staticmethod
+    def handle_detect_file(prefix: pathlib.Path,
+                           s3handler: S3Handler,
+                           path: pathlib.Path):
+        key = prefix / "detections" / path.name
+        s3handler.upload(path, str(key))
+        path.unlink()
+        return 1
+
+    @staticmethod
     def handle_av_file(prefix: pathlib.Path,
                        s3handler: S3Handler,
                        path: pathlib.Path,
                        process: Optional[subprocess.Popen] = None):
-        if Uploader.is_currently_open(path, process): return 0
+        if Uploader.is_currently_open(path): return 0
         try:
             creation_time = Uploader.get_creation_time(path)
             gst_start = datetime.datetime.strptime(path.parent.name, "%Y-%m-%dT%H-%M-%S")
@@ -164,15 +197,8 @@ class Uploader:
         return 1
 
     @staticmethod
-    def is_currently_open(path: pathlib.Path, process: Optional[subprocess.Popen] = None) -> bool:
-        if process is not None and process.poll() is None:
-            openpaths = (
-                pathlib.Path(openpath.path)
-                for openpath in psutil.Process(process.pid).open_files()
-            )
-            if any(pathlib.Path(openpath) == path for openpath in openpaths):
-                return True
-        return False
+    def is_currently_open(path: pathlib.Path) -> bool:
+        return time.time() - os.path.getmtime(str(path)) < 60
 
     @staticmethod
     def keyname(gst_start, start, file):
@@ -199,12 +225,14 @@ class Controller:
                  recorder: Recorder,
                  uploader: Uploader,
                  motion_detector: MotionDetector,
+                 motion_detector_on: bool,
                  database_path: str,
                  available_space_threshold: int = 500000,
                  bad_health_check_threshold: int = 10):
         self.recorder = recorder
         self.uploader = uploader
         self.motion_detector = motion_detector
+        self.motion_detector_on = motion_detector_on
 
         self.available_space_threshold = available_space_threshold
 
@@ -215,9 +243,12 @@ class Controller:
 
         self.recorder_process: Optional[subprocess.Popen] = None
         self.recorder_health_checker: Optional[RecordProcessHealthChecker] = None
+        self.device_checker: Optional[DeviceChecker] = None
+        self.last_health_check = None
         self.bad_consecutive_health_check_counter = 0
         self.bad_health_check_threshold = bad_health_check_threshold
 
+        self.last_uri_check = None
         self.interval_collection: Optional[IntervalCollection] = self.refresh_interval_collection()
         self.record_times: Optional[RecordTime] = self.refresh_record_times()
 
@@ -240,25 +271,38 @@ class Controller:
             recorder=Recorder.from_file(config_path),
             uploader=Uploader.from_file(config_path),
             motion_detector=MotionDetector.from_file(config_path),
+            motion_detector_on=parser.getboolean("recorder", "motion_detector_on", fallback=False),
             database_path=parser.get("device", "database"),
             available_space_threshold=parser.getint(
                 "device", "available_space_threshold", fallback=500000),
-            bad_health_check_threshold=parser.get(
-                "recorder", "bad_health_check_threshold", fallback=10)
+            bad_health_check_threshold=parser.getint(
+                "recorder", "bad_health_check_threshold", fallback=2)
         )
 
-    def run(self, detection=True):
+    def run(self):
         while True:
             _log().debug("running loop")
+
+            start_upload = (
+                Controller.check_wifi() and
+                (self.upload_future is None or self.upload_future.done())
+            )
+            if start_upload:
+                _log().debug("starting uploader")
+                self.start_upload()
+
             self.interval_collection = self.refresh_interval_collection()
             self.record_times = self.refresh_record_times()
             now = datetime.datetime.now()
             blackout = self.is_blackout_datetime(now)
             record_time = self.is_record_time(now)
+            paused = self.get_paused_status()
             can_record = (
                 not blackout and
-                record_time
+                record_time and
+                not paused
             )
+
             if not can_record:
                 _log().debug("cannot record")
                 running_reasons = []
@@ -268,7 +312,8 @@ class Controller:
                     running_reasons.append("disallowed by calendar event")
                 self.set_running_reason(" and ".join(running_reasons))
                 self.set_running_state(0)
-                Controller.kill_gstreamer().wait(timeout=5)
+                if not paused:
+                    Controller.kill_gstreamer().wait(timeout=5)
             else:
                 _log().debug("can record")
             if Controller.space_remaining() > self.available_space_threshold:
@@ -276,19 +321,22 @@ class Controller:
                     can_record and (
                         self.recorder_process is None or
                         self.recorder_process.poll() is not None or
-                        self.uris_changed()
+                        self.uris_changed() and
+                        not self.get_paused_status()
                     )
                 ):
                     self.record()
                     self.set_running_state(1)
                     self.set_running_reason("running")
+                    if self.motion_detector_on:
+                        self.start_motion_detector()
+                elif self.get_paused_status() and self.recorder_process is not None:
+                    Controller.kill_motion_detector()
+                    Controller.kill_gstreamer().wait(5)
                 elif can_record:
                     self.handle_recorder_health()
 
-            if Controller.check_wifi():
-                self.start_upload()
-
-            time.sleep(60)
+            time.sleep(5)
 
     def set_running_state(self, value: int):
         query = """
@@ -307,6 +355,18 @@ class Controller:
         cursor = self.database_conn.cursor()
         cursor.execute(query, (value,))
         self.database_conn.commit()
+
+    def get_paused_status(self) -> bool:
+        query = "SELECT value FROM state WHERE key = 'paused'"
+        cursor = self.database_conn.cursor()
+        cursor.execute(query)
+        value = cursor.fetchone()
+        if value is None:
+            return False
+        try:
+            return bool(int(value[0]))
+        except Exception:
+            return False
 
     @staticmethod
     def check_wifi() -> bool:
@@ -337,10 +397,13 @@ class Controller:
         return ids, uris, names, mains
 
     def uris_changed(self):
+        now = time.time()
+        if self.last_uri_check is not None and now - self.last_uri_check < 60: return False
         _, new_uris, _, _ = self.get_uris()
         old_uris = self.uris
         _log().debug("old uris: %s", "".join(x for x in sorted(old_uris)))
         _log().debug("new uris: %s", "".join(x for x in sorted(new_uris)))
+        self.last_uri_check = now
         return (
             "".join(x[1] for x in sorted(new_uris, key=lambda x: x[1]))
             !=
@@ -364,21 +427,21 @@ class Controller:
                 time.sleep(5)
             if self.motion_detector_future.running(): return
         uri = self.get_main_rtsp_cam()
-        self.motion_detector_future = self.upload_pool.submit(lambda: self.motion_detect(uri))
+        self.motion_detector_future = self.upload_pool.submit(lambda: self.motion_detect(uri, 15.))
         self.motion_detector_future.add_done_callback(self.motion_detector_done)
 
-    def motion_detect(self, uri):
+    def motion_detect(self, uri, sleep: Optional[float] = None):
         _log().debug("starting motion_detector")
         if uri is None:
             _log().info("failed to start motion_detector. No main camera")
             return
-        return self.motion_detector.run(uri)
+        return self.motion_detector.run(uri, sleep=sleep)
 
     def motion_detector_done(self, future):
         if future.exception() is not None:
             _log().error("uncaught processing exception %s", future.exception(), exc_info=True)
         else:
-            _log().info("motion detector stopped unexpectedly")
+            _log().info("mhandle_recorder_healthotion detector stopped unexpectedly")
 
     def start_upload(self):
         self.upload_future = self.upload_pool.submit(self.upload)
@@ -406,6 +469,10 @@ class Controller:
         self.recorder_process = self.recorder.run(now=True)
 
     @staticmethod
+    def kill_motion_detector():
+        MOTION_DETECTOR_KILL_FILE.touch(exist_ok=True)
+
+    @staticmethod
     def kill_gstreamer():
         return subprocess.Popen(["killall", "gst-launch-1.0"])
 
@@ -416,7 +483,12 @@ class Controller:
     def handle_recorder_health(self):
         if self.recorder_health_checker is None:
             self.recorder_health_checker = RecordProcessHealthChecker(self.recorder_process)
-        is_healthy = self.recorder_health_checker.check()
+        if self.device_checker is None:
+            self.device_checker = DeviceChecker(self.database_conn)
+        now = time.time()
+        if self.last_health_check is not None and now - self.last_health_check < 60: return
+        self.last_health_check = now
+        is_healthy = self.recorder_health_checker.check() and self.device_checker.check()
         if is_healthy:
             self.bad_consecutive_health_check_counter = 0
             return
@@ -425,9 +497,10 @@ class Controller:
         self.set_running_state(0)
         self.bad_consecutive_health_check_counter += 1
         if self.bad_consecutive_health_check_counter > self.bad_health_check_threshold:
-            subprocess.Popen(["sudo reboot"])
+            subprocess.Popen(["sudo", "reboot"])
         else:
             Controller.super_kill_gstreamer().wait(timeout=5)
+            Controller.kill_motion_detector()
 
     # handle record times
 
@@ -458,6 +531,41 @@ class Controller:
             _log().debug("record: %s", is_record)
             return bool(is_record)
         return True
+
+
+class DeviceChecker:
+    def __init__(self, database_conn):
+        self.database_conn = database_conn
+        self.devices: Optional[Dict[str, bool]] = None
+
+    def check(self) -> bool:
+        if self.devices is None:
+            self.devices = self.refresh_devices()
+            return True
+
+        devices = self.refresh_devices()
+        health = True
+        for device, _health in devices.items():
+            if device not in self.devices or not _health:
+                health = False
+        for device, _ in self.devices.items():
+            if device not in devices:
+                health = False
+        self.devices = devices
+        if not health:
+            _log().warn("devices changed")
+        return health
+
+    def refresh_devices(self):
+        devices = {}
+        pulse_src = Recorder._get_pulse_source()
+        if pulse_src is not None:
+            devices[pulse_src] = True
+        cursor = self.database_conn.cursor()
+        for _, uri, _ in cursor.execute("SELECT id, uri, name FROM rtspuri;"):
+            health = check_rtsp_health(uri)
+            devices[uri] = health
+        return devices
 
 
 class RecordProcessHealthChecker:
