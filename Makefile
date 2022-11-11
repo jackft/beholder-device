@@ -34,3 +34,7 @@ build_webapp:
 clean:
 	cd beholder-recorder && make --makefile=Makefile.recorder clean
 	cd beholder-recorder && make --makefile=Makefile.webapp clean
+
+clean_environment:
+	rm beholder-recorder/.dbinitialized
+	rm /home/${USER}/Desktop/beholder-data/database.sqlite
