@@ -230,7 +230,7 @@
               },
               error: (data) => {
                 this.warning.style.display = "block";
-                if ("error" in data.responseJSON && data.responseJSON.error === "duplicate host") {
+                if (data !== undefined && "error" in data.responseJSON && data.responseJSON.error === "duplicate host") {
                   this.warning.innerText = "camera with ip already exists";
                 } else {
                   this.warning.innerText = "please enter a valid uri or name";

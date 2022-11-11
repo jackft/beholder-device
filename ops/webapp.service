@@ -1,6 +1,6 @@
 [Unit]
 Description=Webapp for beholder
-After=network-online.target
+After=network-online.target beholder-startup.service recorder.service
 Wants=network-online.target systemd-networkd-wait-online.service
 
 StartLimitIntervalSec=90

@@ -19,12 +19,15 @@ def create_app():
         app.register_blueprint(home.home_bp)
 
         # always clear paused reason
-        paused = db.session.query(State).filter(State.key == "paused").first()
-        if paused is None:
-            paused_state = State(key="paused", value="0")
-            db.session.add(paused_state)
-        else:
-            paused.value = "0"
-        db.session.commit()
+        try:
+            paused = db.session.query(State).filter(State.key == "paused").first()
+            if paused is None:
+                paused_state = State(key="paused", value="0")
+                db.session.add(paused_state)
+            else:
+                paused.value = "0"
+            db.session.commit()
+        except Exception:
+            pass
 
         return app

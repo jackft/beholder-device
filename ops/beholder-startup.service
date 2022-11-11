@@ -1,0 +1,14 @@
+[Unit]
+Description=Beholder startup
+
+[Service]
+RemainAfterExit=true
+Type=oneshot
+Type=simple
+User=beholder
+WorkingDirectory=/home/beholder/beholder-device/beholder-recorder
+ExecStart=/home/beholder/beholder-device/beholder-recorder/startup.sh
+
+[Install]
+WantedBy=multi-user.target
+

@@ -25,3 +25,7 @@ systemctl start webapp
 cp ops/recorder.service /etc/systemd/system
 systemctl enable recorder
 systemctl start recorder
+
+cp ops/beholder-startup.service /etc/systemd/system
+systemctl enable beholder-startup
+systemctl start beholder-startup

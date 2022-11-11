@@ -1,5 +1,5 @@
 #!/bin/bash
-# start.sh
+# start-webapp.sh
 
 export FLASK_APP=wsgi.py
 export FLASK_DEBUG=1
